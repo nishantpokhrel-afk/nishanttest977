@@ -37,7 +37,7 @@
 
   .scroll-area {
     width: 100%;
-    padding: 10px 20px 28px;
+    padding: 48px 20px 28px;
     scrollbar-width: none;
   }
   .scroll-area::-webkit-scrollbar { display: none; }
@@ -691,6 +691,21 @@
   @keyframes spin { to { transform: rotate(360deg); } }
 
   .clearfix::after { content: ''; display: block; clear: both; }
+
+  /* SYNC ERROR */
+  .sync-error {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    margin-top: 14px;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--muted);
+  }
+  .sync-error svg {
+    flex-shrink: 0;
+    color: var(--muted);
+  }
 </style>
 </head>
 <body>
@@ -777,7 +792,7 @@
 
     <!-- HEART RATE ROW -->
     <div class="two-col">
-      <div class="card">
+      <div class="card" id="heartCard">
         <span class="label">Heart Rate</span>
         <div class="heart-card-inner" style="margin-top:6px;">
           <div>
@@ -792,7 +807,7 @@
           </svg>
         </div>
       </div>
-      <div class="card">
+      <div class="card" id="restingCard">
         <span class="label">Resting HR</span>
         <div style="margin-top:6px;">
           <div class="heart-bpm">
@@ -805,7 +820,7 @@
     </div>
 
     <!-- SLEEP CARD -->
-    <div class="card">
+    <div class="card" id="sleepCard">
       <div class="sleep-header">
         <div>
           <span class="label">Sleep · Last Night</span>
@@ -818,7 +833,7 @@
     </div>
 
     <!-- ENERGY CARD -->
-    <div class="card">
+    <div class="card" id="energyCard">
       <span class="label">Energy Burned</span>
       <div class="big-stat" style="margin-top:6px;" id="totalKcal">–<span style="font-size:14px;font-weight:600;color:var(--ink-2);margin-left:3px;">kcal</span></div>
       <div class="stack-bar-wrap" id="stackBar"></div>
@@ -838,7 +853,7 @@
     </div>
 
     <!-- WATER CARD -->
-    <div class="card">
+    <div class="card" id="waterCard">
       <div class="water-header">
         <span class="label">Water Intake</span>
         <span class="water-ml" id="waterMl">– ml</span>
@@ -854,7 +869,7 @@
     </div>
 
     <!-- WORKOUTS CARD -->
-    <div class="card">
+    <div class="card" id="workoutsCard">
       <div class="workout-header">
         <span class="label">Workouts</span>
         <span class="workout-count" id="workoutCount">This week · – sessions</span>
@@ -935,29 +950,12 @@ let modalOpen = false
 let draft = 8000
 let barsAnimated = false
 
-// Mock data fallback
-const MOCK = {
-  WEEK: [
-    { d: 'SUN', v: 6200 }, { d: 'MON', v: 9400 }, { d: 'TUE', v: 19800 },
-    { d: 'WED', v: 22600 }, { d: 'THU', v: 9100 }, { d: 'FRI', v: 3800 },
-    { d: 'SAT', v: 19400 }
-  ],
-  TODAY_STEPS: 5000,
-  YESTERDAY_STEPS: 7000,
-  HEART_BPM: 100,
-  RESTING_BPM: 62,
-  RESTING_AVG: 64,
-  SLEEP: { totalMin: 7*60+24, stages: [{ key:'deep', label:'Deep', min:78 }, { key:'rem', label:'REM', min:112 }, { key:'light', label:'Light', min:224 }, { key:'awake', label:'Awake', min:30 }], start: '11:38 PM', end: '7:43 AM' },
-  CALORIES: { activeGoal: 600, active: 412, basal: 1480 },
-  WATER: { cups: 5, goal: 8, mlPerCup: 240 },
-  WORKOUTS: [
-    { type: 'Run', dur: 38, kcal: 412, time: 'Today · 7:12 AM' },
-    { type: 'Strength', dur: 45, kcal: 286, time: 'Yesterday' },
-    { type: 'Yoga', dur: 30, kcal: 132, time: 'May 10' }
-  ]
+// Live health data — null means not synced
+const healthData = {
+  WEEK: null, TODAY_STEPS: null, YESTERDAY_STEPS: null,
+  HEART_BPM: null, RESTING_BPM: null, RESTING_AVG: null,
+  SLEEP: null, CALORIES: null, WATER_CUPS: null, WORKOUTS: null,
 }
-
-let healthData = { ...MOCK }
 
 // ─── App theme ────────────────────────────────────────────────────────────────
 async function applyAppTheme() {
@@ -1010,17 +1008,27 @@ function renderHeader() {
     now.toLocaleDateString('en-US', { weekday:'short', month:'short', day:'numeric' }).toUpperCase()
 }
 
+function syncError(cardId) {
+  const card = document.getElementById(cardId)
+  if (!card || card.querySelector('.sync-error')) return
+  const msg = document.createElement('div')
+  msg.className = 'sync-error'
+  msg.innerHTML = '<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="8" cy="8" r="6.5"/><path d="M8 5v3.5M8 11h.01"/></svg>Sync unsuccessful — check your permissions'
+  card.appendChild(msg)
+}
+
 function renderSteps() {
-  const week = healthData.WEEK || MOCK.WEEK
+  if (healthData.WEEK === null) {
+    syncError('stepsCard')
+    return
+  }
+  const week = healthData.WEEK
   const avg = Math.round(week.reduce((s, d) => s + d.v, 0) / week.length)
   document.getElementById('avgSteps').textContent = fmtNum(avg)
-
-  // Chart
   renderChart(week)
 
-  // Today / Yesterday
-  const today = healthData.TODAY_STEPS ?? MOCK.TODAY_STEPS
-  const yest  = healthData.YESTERDAY_STEPS ?? MOCK.YESTERDAY_STEPS
+  const today = healthData.TODAY_STEPS ?? 0
+  const yest  = healthData.YESTERDAY_STEPS ?? 0
 
   document.getElementById('todaySteps').textContent = fmtNum(today)
   document.getElementById('yestSteps').textContent  = fmtNum(yest)
@@ -1040,24 +1048,21 @@ function renderSteps() {
 
 function renderChart(week) {
   const CEIL = 25000
-  const barsArea = document.getElementById('chartBars')
-  const xlabels  = document.getElementById('chartXLabels')
+  const barsArea  = document.getElementById('chartBars')
+  const xlabels   = document.getElementById('chartXLabels')
   const tickLines = document.getElementById('chartTickLines')
 
   barsArea.innerHTML = ''
   xlabels.innerHTML  = ''
   tickLines.innerHTML = ''
 
-  // Tick lines at 5k, 10k, 20k
   ;[5000, 10000, 20000].forEach(v => {
-    const pct = (v / CEIL) * 100
     const line = document.createElement('div')
     line.className = 'tick-line'
-    line.style.bottom = pct + '%'
+    line.style.bottom = (v / CEIL) * 100 + '%'
     tickLines.appendChild(line)
   })
 
-  // Goal line
   const goalPct = Math.min(100, (goal / CEIL) * 100)
   const gLine = document.createElement('div')
   gLine.className = 'goal-line'
@@ -1069,15 +1074,12 @@ function renderChart(week) {
   tickLines.appendChild(gLine)
   tickLines.appendChild(gLabel)
 
-  // Bars
   week.forEach((day, i) => {
     const col = document.createElement('div')
     col.className = 'bar-col'
-
     const bar = document.createElement('div')
     bar.className = 'bar ' + (day.v >= goal ? 'above-goal' : 'below-goal')
-    const heightPct = (day.v / CEIL) * 100
-    bar.style.height = heightPct + '%'
+    bar.style.height = (day.v / CEIL) * 100 + '%'
     col.appendChild(bar)
     barsArea.appendChild(col)
 
@@ -1097,13 +1099,16 @@ function renderChart(week) {
 }
 
 function renderHeart() {
-  document.getElementById('heartBpm').textContent = fmtNum(healthData.HEART_BPM ?? MOCK.HEART_BPM)
-  document.getElementById('restingBpm').textContent = fmtNum(healthData.RESTING_BPM ?? MOCK.RESTING_BPM)
-  document.getElementById('restingSub').textContent = `7-day avg · ${healthData.RESTING_AVG ?? MOCK.RESTING_AVG}`
+  if (healthData.HEART_BPM === null) { syncError('heartCard'); return }
+  document.getElementById('heartBpm').textContent = fmtNum(healthData.HEART_BPM)
+  if (healthData.RESTING_BPM === null) { syncError('restingCard'); return }
+  document.getElementById('restingBpm').textContent = fmtNum(healthData.RESTING_BPM)
+  document.getElementById('restingSub').textContent = '7-day avg · ' + (healthData.RESTING_AVG ?? '–')
 }
 
 function renderSleep() {
-  const sl = healthData.SLEEP || MOCK.SLEEP
+  if (healthData.SLEEP === null) { syncError('sleepCard'); return }
+  const sl = healthData.SLEEP
   document.getElementById('sleepTotal').textContent = fmtMin(sl.totalMin)
   document.getElementById('sleepRange').textContent = sl.start + ' – ' + sl.end
 
@@ -1141,31 +1146,35 @@ function renderSleep() {
 }
 
 function renderEnergy() {
-  const c = healthData.CALORIES || MOCK.CALORIES
+  if (healthData.CALORIES === null) { syncError('energyCard'); return }
+  const c = healthData.CALORIES
   document.getElementById('totalKcal').innerHTML = `${fmtNum(c.active + c.basal)}<span style="font-size:14px;font-weight:600;color:var(--ink-2);margin-left:3px;">kcal</span>`
   document.getElementById('activeKcal').innerHTML = `${fmtNum(c.active)}<span>kcal</span>`
   document.getElementById('basalKcal').innerHTML  = `${fmtNum(c.basal)}<span>kcal</span>`
 
-  const stackBar = document.getElementById('stackBar')
   const total = c.active + c.basal
-  const activePct = (c.active / total) * 100
-  stackBar.innerHTML = `
+  const activePct = total > 0 ? (c.active / total) * 100 : 0
+  document.getElementById('stackBar').innerHTML = `
     <div style="width:${activePct}%;background:var(--accent);height:100%;"></div>
     <div style="flex:1;background:color-mix(in oklab,var(--accent) 20%,white);height:100%;"></div>
   `
-
-  const activeProg = Math.min(100, (c.active / c.activeGoal) * 100)
-  document.getElementById('activeBar').style.width = activeProg + '%'
+  document.getElementById('activeBar').style.width = Math.min(100, (c.active / (c.activeGoal || 600)) * 100) + '%'
 }
 
 function renderWater() {
-  const w = healthData.WATER || MOCK.WATER
-  document.getElementById('waterCups').textContent = `${cups}/${w.goal}`
-  document.getElementById('waterMl').textContent   = fmtNum(cups * w.mlPerCup) + ' ml'
+  const GOAL = 8
+  const ML   = 240
+  if (healthData.WATER_CUPS === null) {
+    syncError('waterCard')
+    return
+  }
+  cups = healthData.WATER_CUPS
+  document.getElementById('waterCups').textContent = `${cups}/${GOAL}`
+  document.getElementById('waterMl').textContent   = fmtNum(cups * ML) + ' ml'
 
   const cupsRow = document.getElementById('cupsRow')
   cupsRow.innerHTML = ''
-  for (let i = 0; i < w.goal; i++) {
+  for (let i = 0; i < GOAL; i++) {
     const btn = document.createElement('button')
     btn.className = 'cup-btn' + (i < cups ? ' filled' : '')
     btn.innerHTML = `
@@ -1178,17 +1187,17 @@ function renderWater() {
     const idx = i
     btn.addEventListener('click', () => {
       cups = (cups === idx + 1) ? idx : idx + 1
+      healthData.WATER_CUPS = cups
       renderWater()
     })
     cupsRow.appendChild(btn)
   }
-
-  const pct = Math.min(100, (cups / w.goal) * 100)
-  document.getElementById('waterBar').style.width = pct + '%'
+  document.getElementById('waterBar').style.width = Math.min(100, (cups / GOAL) * 100) + '%'
 }
 
 function renderWorkouts() {
-  const list = healthData.WORKOUTS || MOCK.WORKOUTS
+  if (healthData.WORKOUTS === null) { syncError('workoutsCard'); return }
+  const list = healthData.WORKOUTS
   document.getElementById('workoutCount').textContent = `This week · ${list.length} sessions`
 
   const abbr = { Run:'RUN', Strength:'STR', Yoga:'YGA', Cycling:'CYC', Swimming:'SWM', Walk:'WLK' }
@@ -1273,24 +1282,20 @@ document.addEventListener('keydown', e => {
 
 // ─── Health Data Loading ───────────────────────────────────────────────────────
 async function loadHealthData() {
-  if (!state.USER) return // no Cogniss context — use mock
+  if (!state.USER) return
 
   postToApp('LOG', { message: '[HK] loadHealthData start, user: ' + state.USER.id })
 
+  const now = new Date()
+  const todayStart = new Date(now); todayStart.setHours(0,0,0,0)
+  const yesterdayStart = new Date(todayStart); yesterdayStart.setDate(yesterdayStart.getDate()-1)
+
+  // Steps
   try {
-    const now = new Date()
-    const todayStart = new Date(now); todayStart.setHours(0,0,0,0)
-    const yesterdayStart = new Date(todayStart); yesterdayStart.setDate(yesterdayStart.getDate()-1)
-
-    // Steps last 7 days
-    let stepsRes
-    try {
-      stepsRes = await restRequest('list', 'AppleHealthRecord', {
-        user: state.USER.id, type: 'STEP_COUNT', sort: '-start', limit: 50
-      })
-      postToApp('LOG', { message: '[HK] STEP_COUNT count: ' + (stepsRes?.items?.length ?? 'null') })
-    } catch(e) { postToApp('LOG', { message: '[HK] STEP_COUNT error: ' + e.message }) }
-
+    const stepsRes = await restRequest('list', 'AppleHealthRecord', {
+      user: state.USER.id, type: 'STEP_COUNT', sort: '-start', limit: 50
+    })
+    postToApp('LOG', { message: '[HK] STEP_COUNT count: ' + (stepsRes?.items?.length ?? 'null') })
     if (stepsRes?.items?.length) {
       const dayMap = {}
       stepsRes.items.forEach(r => {
@@ -1305,126 +1310,117 @@ async function loadHealthData() {
       healthData.YESTERDAY_STEPS = Math.round(stepsRes.items
         .filter(r => new Date(r.start) >= yesterdayStart && new Date(r.start) < todayStart)
         .reduce((s, r) => s + (r.value||0), 0))
-      postToApp('LOG', { message: '[HK] today steps: ' + healthData.TODAY_STEPS })
     }
+  } catch(e) { postToApp('LOG', { message: '[HK] STEP_COUNT error: ' + e.message }) }
 
-    // Heart rate
-    try {
-      const hrRes = await restRequest('list', 'AppleHealthRecord', {
-        user: state.USER.id, type: 'HEART_RATE', sort: '-start', limit: 1
-      })
-      postToApp('LOG', { message: '[HK] HEART_RATE count: ' + (hrRes?.items?.length ?? 'null') })
-      if (hrRes?.items?.[0]) healthData.HEART_BPM = Math.round(hrRes.items[0].value)
-    } catch(e) { postToApp('LOG', { message: '[HK] HEART_RATE error: ' + e.message }) }
+  // Heart rate
+  try {
+    const hrRes = await restRequest('list', 'AppleHealthRecord', {
+      user: state.USER.id, type: 'HEART_RATE', sort: '-start', limit: 1
+    })
+    postToApp('LOG', { message: '[HK] HEART_RATE count: ' + (hrRes?.items?.length ?? 'null') })
+    if (hrRes?.items?.[0]) healthData.HEART_BPM = Math.round(hrRes.items[0].value)
+  } catch(e) { postToApp('LOG', { message: '[HK] HEART_RATE error: ' + e.message }) }
 
-    // Resting HR
-    try {
-      const rhrRes = await restRequest('list', 'AppleHealthRecord', {
-        user: state.USER.id, type: 'RESTING_HEART_RATE', sort: '-start', limit: 7
-      })
-      postToApp('LOG', { message: '[HK] RESTING_HEART_RATE count: ' + (rhrRes?.items?.length ?? 'null') })
-      if (rhrRes?.items?.length) {
-        healthData.RESTING_BPM = Math.round(rhrRes.items[0].value)
-        healthData.RESTING_AVG = Math.round(rhrRes.items.reduce((s, r) => s + r.value, 0) / rhrRes.items.length)
-      }
-    } catch(e) { postToApp('LOG', { message: '[HK] RESTING_HEART_RATE error: ' + e.message }) }
+  // Resting HR
+  try {
+    const rhrRes = await restRequest('list', 'AppleHealthRecord', {
+      user: state.USER.id, type: 'RESTING_HEART_RATE', sort: '-start', limit: 7
+    })
+    postToApp('LOG', { message: '[HK] RESTING_HEART_RATE count: ' + (rhrRes?.items?.length ?? 'null') })
+    if (rhrRes?.items?.length) {
+      healthData.RESTING_BPM = Math.round(rhrRes.items[0].value)
+      healthData.RESTING_AVG = Math.round(rhrRes.items.reduce((s,r)=>s+r.value,0) / rhrRes.items.length)
+    }
+  } catch(e) { postToApp('LOG', { message: '[HK] RESTING_HEART_RATE error: ' + e.message }) }
 
-    // Sleep
-    try {
-      const sleepRes = await restRequest('list', 'AppleHealthRecord', {
-        user: state.USER.id, type: 'SLEEP_SAMPLES', sort: '-start', limit: 30
-      })
-      postToApp('LOG', { message: '[HK] SLEEP_SAMPLES count: ' + (sleepRes?.items?.length ?? 'null') })
-      if (sleepRes?.items?.length) {
-        const lastNight = sleepRes.items.filter(r => new Date(r.start) >= yesterdayStart)
-        postToApp('LOG', { message: '[HK] SLEEP last night samples: ' + lastNight.length })
-        if (lastNight.length) {
-          const asleepMin = Math.round(lastNight.filter(r=>r.classification==='ASLEEP').reduce((s,r)=>s+(new Date(r.end)-new Date(r.start))/60000,0))
-          const awakeMn   = Math.round(lastNight.filter(r=>r.classification==='AWAKE').reduce((s,r)=>s+(new Date(r.end)-new Date(r.start))/60000,0))
-          const startT = new Date(Math.min(...lastNight.map(r=>new Date(r.start))))
-          const endT   = new Date(Math.max(...lastNight.map(r=>new Date(r.end))))
-          const fmt = d => d.toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'})
-          healthData.SLEEP = {
-            totalMin: asleepMin,
-            stages: [
-              { key:'deep',  label:'Deep',  min: Math.round(asleepMin * 0.18) },
-              { key:'rem',   label:'REM',   min: Math.round(asleepMin * 0.25) },
-              { key:'light', label:'Light', min: Math.round(asleepMin * 0.50) },
-              { key:'awake', label:'Awake', min: awakeMn || Math.round(asleepMin * 0.07) }
-            ],
-            start: fmt(startT), end: fmt(endT)
-          }
+  // Sleep
+  try {
+    const sleepRes = await restRequest('list', 'AppleHealthRecord', {
+      user: state.USER.id, type: 'SLEEP_SAMPLES', sort: '-start', limit: 30
+    })
+    postToApp('LOG', { message: '[HK] SLEEP_SAMPLES count: ' + (sleepRes?.items?.length ?? 'null') })
+    if (sleepRes?.items?.length) {
+      const lastNight = sleepRes.items.filter(r => new Date(r.start) >= yesterdayStart)
+      if (lastNight.length) {
+        const asleepMin = Math.round(lastNight.filter(r=>r.classification==='ASLEEP').reduce((s,r)=>s+(new Date(r.end)-new Date(r.start))/60000,0))
+        const awakeMn   = Math.round(lastNight.filter(r=>r.classification==='AWAKE').reduce((s,r)=>s+(new Date(r.end)-new Date(r.start))/60000,0))
+        const startT = new Date(Math.min(...lastNight.map(r=>new Date(r.start))))
+        const endT   = new Date(Math.max(...lastNight.map(r=>new Date(r.end))))
+        const fmt = d => d.toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'})
+        healthData.SLEEP = {
+          totalMin: asleepMin,
+          stages: [
+            { key:'deep',  label:'Deep',  min: Math.round(asleepMin*0.18) },
+            { key:'rem',   label:'REM',   min: Math.round(asleepMin*0.25) },
+            { key:'light', label:'Light', min: Math.round(asleepMin*0.50) },
+            { key:'awake', label:'Awake', min: awakeMn || Math.round(asleepMin*0.07) }
+          ],
+          start: fmt(startT), end: fmt(endT)
         }
       }
-    } catch(e) { postToApp('LOG', { message: '[HK] SLEEP_SAMPLES error: ' + e.message }) }
-
-    // Calories
-    try {
-      const activeRes = await restRequest('list', 'AppleHealthRecord', {
-        user: state.USER.id, type: 'ACTIVE_ENERGY_BURNED', sort: '-start', limit: 50
-      })
-      postToApp('LOG', { message: '[HK] ACTIVE_ENERGY count: ' + (activeRes?.items?.length ?? 'null') })
-      if (activeRes?.items?.length) {
-        const active = Math.round(activeRes.items.filter(r=>new Date(r.start)>=todayStart).reduce((s,r)=>s+(r.value||0),0))
-        if (active > 0) healthData.CALORIES = { ...MOCK.CALORIES, active }
-      }
-    } catch(e) { postToApp('LOG', { message: '[HK] ACTIVE_ENERGY error: ' + e.message }) }
-
-    try {
-      const basalRes = await restRequest('list', 'AppleHealthRecord', {
-        user: state.USER.id, type: 'BASAL_ENERGY_BURNED', sort: '-start', limit: 50
-      })
-      postToApp('LOG', { message: '[HK] BASAL_ENERGY count: ' + (basalRes?.items?.length ?? 'null') })
-      if (basalRes?.items?.length) {
-        const basal = Math.round(basalRes.items.filter(r=>new Date(r.start)>=todayStart).reduce((s,r)=>s+(r.value||0),0))
-        if (basal > 0) healthData.CALORIES.basal = basal
-      }
-    } catch(e) { postToApp('LOG', { message: '[HK] BASAL_ENERGY error: ' + e.message }) }
-
-    // Water
-    try {
-      const waterRes = await restRequest('list', 'AppleHealthRecord', {
-        user: state.USER.id, type: 'WATER', sort: '-start', limit: 20
-      })
-      postToApp('LOG', { message: '[HK] WATER count: ' + (waterRes?.items?.length ?? 'null') })
-      if (waterRes?.items?.length) {
-        const totalLitres = waterRes.items.filter(r=>new Date(r.start)>=todayStart).reduce((s,r)=>s+(r.value||0),0)
-        cups = Math.round((totalLitres * 1000) / 240)
-      }
-    } catch(e) { postToApp('LOG', { message: '[HK] WATER error: ' + e.message }) }
-
-    // Workouts
-    try {
-      const woRes = await restRequest('list', 'AppleHealthRecord', {
-        user: state.USER.id, type: 'WORKOUT', sort: '-start', limit: 10
-      })
-      postToApp('LOG', { message: '[HK] WORKOUT count: ' + (woRes?.items?.length ?? 'null') })
-      if (woRes?.items?.length) {
-        const fmt = d => {
-          const diff = Math.floor((now - new Date(d)) / 86400000)
-          if (diff === 0) return 'Today · ' + new Date(d).toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'})
-          if (diff === 1) return 'Yesterday'
-          return new Date(d).toLocaleDateString('en-US',{month:'short',day:'numeric'})
-        }
-        healthData.WORKOUTS = woRes.items.slice(0,5).map(w => ({
-          type: w.activityName || 'Workout',
-          dur:  Math.round((new Date(w.end) - new Date(w.start)) / 60000),
-          kcal: Math.round(w.calories || 0),
-          time: fmt(w.start)
-        }))
-      }
-    } catch(e) { postToApp('LOG', { message: '[HK] WORKOUT error: ' + e.message }) }
-
-    // Goal from CONFIG
-    if (state.CONFIG?.step_goal) {
-      goal = parseInt(state.CONFIG.step_goal) || 8000
     }
+  } catch(e) { postToApp('LOG', { message: '[HK] SLEEP_SAMPLES error: ' + e.message }) }
 
-    postToApp('LOG', { message: '[HK] loadHealthData complete' })
+  // Calories
+  try {
+    const activeRes = await restRequest('list', 'AppleHealthRecord', {
+      user: state.USER.id, type: 'ACTIVE_ENERGY_BURNED', sort: '-start', limit: 50
+    })
+    const basalRes = await restRequest('list', 'AppleHealthRecord', {
+      user: state.USER.id, type: 'BASAL_ENERGY_BURNED', sort: '-start', limit: 50
+    })
+    postToApp('LOG', { message: '[HK] ACTIVE_ENERGY count: ' + (activeRes?.items?.length ?? 'null') })
+    postToApp('LOG', { message: '[HK] BASAL_ENERGY count: ' + (basalRes?.items?.length ?? 'null') })
+    const active = activeRes?.items?.length
+      ? Math.round(activeRes.items.filter(r=>new Date(r.start)>=todayStart).reduce((s,r)=>s+(r.value||0),0))
+      : null
+    const basal = basalRes?.items?.length
+      ? Math.round(basalRes.items.filter(r=>new Date(r.start)>=todayStart).reduce((s,r)=>s+(r.value||0),0))
+      : null
+    if (active !== null || basal !== null) {
+      healthData.CALORIES = { active: active ?? 0, basal: basal ?? 0, activeGoal: 600 }
+    }
+  } catch(e) { postToApp('LOG', { message: '[HK] CALORIES error: ' + e.message }) }
 
-  } catch (err) {
-    postToApp('LOG', { message: '[HK] outer error: ' + err.message })
-  }
+  // Water
+  try {
+    const waterRes = await restRequest('list', 'AppleHealthRecord', {
+      user: state.USER.id, type: 'WATER', sort: '-start', limit: 20
+    })
+    postToApp('LOG', { message: '[HK] WATER count: ' + (waterRes?.items?.length ?? 'null') })
+    if (waterRes?.items?.length) {
+      const totalLitres = waterRes.items.filter(r=>new Date(r.start)>=todayStart).reduce((s,r)=>s+(r.value||0),0)
+      healthData.WATER_CUPS = Math.round((totalLitres * 1000) / 240)
+    }
+  } catch(e) { postToApp('LOG', { message: '[HK] WATER error: ' + e.message }) }
+
+  // Workouts
+  try {
+    const woRes = await restRequest('list', 'AppleHealthRecord', {
+      user: state.USER.id, type: 'WORKOUT', sort: '-start', limit: 10
+    })
+    postToApp('LOG', { message: '[HK] WORKOUT count: ' + (woRes?.items?.length ?? 'null') })
+    if (woRes?.items?.length) {
+      const fmt = d => {
+        const diff = Math.floor((now - new Date(d)) / 86400000)
+        if (diff === 0) return 'Today · ' + new Date(d).toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'})
+        if (diff === 1) return 'Yesterday'
+        return new Date(d).toLocaleDateString('en-US',{month:'short',day:'numeric'})
+      }
+      healthData.WORKOUTS = woRes.items.slice(0,5).map(w => ({
+        type: w.activityName || 'Workout',
+        dur:  Math.round((new Date(w.end)-new Date(w.start))/60000),
+        kcal: Math.round(w.calories||0),
+        time: fmt(w.start)
+      }))
+    }
+  } catch(e) { postToApp('LOG', { message: '[HK] WORKOUT error: ' + e.message }) }
+
+  // Goal from CONFIG
+  if (state.CONFIG?.step_goal) goal = parseInt(state.CONFIG.step_goal) || 8000
+
+  postToApp('LOG', { message: '[HK] loadHealthData complete' })
 }
 
 // ─── Init messages ────────────────────────────────────────────────────────────
