@@ -692,6 +692,46 @@
 
   .clearfix::after { content: ''; display: block; clear: both; }
 
+  /* SYNC LOG */
+  .sync-log-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 12px;
+  }
+  .sync-log-time {
+    font-size: 10px; font-weight: 600;
+    color: var(--muted);
+    font-variant-numeric: tabular-nums;
+  }
+  .sync-log-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 0;
+    border-top: 1px solid var(--hair);
+  }
+  .sync-log-dot {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+  .sync-log-dot.ok      { background: #1f8a5b; }
+  .sync-log-dot.fail    { background: #d97757; }
+  .sync-log-dot.empty   { background: var(--muted); }
+  .sync-log-name {
+    font-size: 12px; font-weight: 600;
+    color: var(--ink);
+    flex: 1;
+  }
+  .sync-log-status {
+    font-size: 11px; font-weight: 500;
+    color: var(--muted);
+    text-align: right;
+  }
+  .sync-log-status.ok   { color: #1f8a5b; }
+  .sync-log-status.fail { color: #d97757; }
+
   /* SYNC ERROR */
   .sync-error {
     display: flex;
@@ -877,6 +917,15 @@
       <div id="workoutRows"></div>
     </div>
 
+    <!-- SYNC LOG CARD -->
+    <div class="card" id="syncLogCard">
+      <div class="sync-log-header">
+        <span class="label">Sync Log</span>
+        <span class="sync-log-time" id="syncLogTime">–</span>
+      </div>
+      <div id="syncLogRows"></div>
+    </div>
+
   </div><!-- /scroll-area -->
 
   <!-- SCRIM -->
@@ -957,6 +1006,9 @@ let modalOpen = false
 let draft = 8000
 let barsAnimated = false
 
+// Sync log entries populated during loadHealthData
+const syncLog = []
+
 // Live health data — null means not synced
 const healthData = {
   WEEK: null, TODAY_STEPS: null, YESTERDAY_STEPS: null,
@@ -1007,6 +1059,7 @@ function renderAll() {
   renderEnergy()
   renderWater()
   renderWorkouts()
+  renderSyncLog()
 }
 
 function renderHeader() {
@@ -1228,6 +1281,36 @@ function renderWorkouts() {
   })
 }
 
+function renderSyncLog() {
+  const rows = document.getElementById('syncLogRows')
+  const timeEl = document.getElementById('syncLogTime')
+  if (!rows) return
+  rows.innerHTML = ''
+  if (syncLog.length === 0) {
+    timeEl.textContent = '–'
+    const empty = document.createElement('div')
+    empty.className = 'sync-log-row'
+    empty.innerHTML = '<div class="sync-log-dot empty"></div><span class="sync-log-name">No sync attempted yet</span>'
+    rows.appendChild(empty)
+    return
+  }
+  timeEl.textContent = new Date().toLocaleTimeString('en-US', { hour:'numeric', minute:'2-digit' })
+  syncLog.forEach(entry => {
+    const row = document.createElement('div')
+    row.className = 'sync-log-row'
+    const statusClass = entry.status === 'ok' ? 'ok' : entry.status === 'empty' ? 'empty' : 'fail'
+    const statusText  = entry.status === 'ok'    ? entry.count + ' record' + (entry.count !== 1 ? 's' : '')
+                      : entry.status === 'empty' ? 'No data'
+                      : 'Failed — ' + entry.error
+    row.innerHTML = `
+      <div class="sync-log-dot ${statusClass}"></div>
+      <span class="sync-log-name">${entry.name}</span>
+      <span class="sync-log-status ${statusClass}">${statusText}</span>
+    `
+    rows.appendChild(row)
+  })
+}
+
 // ─── Modal ────────────────────────────────────────────────────────────────────
 function openModal() {
   draft = goal
@@ -1288,11 +1371,15 @@ document.addEventListener('keydown', e => {
 })
 
 // ─── Health Data Loading ───────────────────────────────────────────────────────
+function logSync(name, status, count, error) {
+  syncLog.push({ name, status, count: count || 0, error: error || '' })
+  postToApp('LOG', { message: '[HK] ' + name + ': ' + status + (count != null ? ' (' + count + ')' : '') + (error ? ' — ' + error : '') })
+}
+
 async function loadHealthData() {
   if (!state.USER) return
 
-  postToApp('LOG', { message: '[HK] loadHealthData start, user: ' + state.USER.id })
-
+  syncLog.length = 0 // reset on each load
   const now = new Date()
   const todayStart = new Date(now); todayStart.setHours(0,0,0,0)
   const yesterdayStart = new Date(todayStart); yesterdayStart.setDate(yesterdayStart.getDate()-1)
@@ -1302,8 +1389,8 @@ async function loadHealthData() {
     const stepsRes = await restRequest('list', 'AppleHealthRecord', {
       user: state.USER.id, type: 'STEP_COUNT', sort: '-start', limit: 50
     })
-    postToApp('LOG', { message: '[HK] STEP_COUNT count: ' + (stepsRes?.items?.length ?? 'null') })
-    if (stepsRes?.items?.length) {
+    const n = stepsRes?.items?.length || 0
+    if (n) {
       const dayMap = {}
       stepsRes.items.forEach(r => {
         const key = new Date(r.start).toLocaleDateString('en-US', { weekday:'short' }).toUpperCase()
@@ -1317,37 +1404,42 @@ async function loadHealthData() {
       healthData.YESTERDAY_STEPS = Math.round(stepsRes.items
         .filter(r => new Date(r.start) >= yesterdayStart && new Date(r.start) < todayStart)
         .reduce((s, r) => s + (r.value||0), 0))
+      logSync('Step Count', 'ok', n)
+    } else {
+      logSync('Step Count', 'empty')
     }
-  } catch(e) { postToApp('LOG', { message: '[HK] STEP_COUNT error: ' + e.message }) }
+  } catch(e) { logSync('Step Count', 'fail', null, e.message) }
 
   // Heart rate
   try {
     const hrRes = await restRequest('list', 'AppleHealthRecord', {
       user: state.USER.id, type: 'HEART_RATE', sort: '-start', limit: 1
     })
-    postToApp('LOG', { message: '[HK] HEART_RATE count: ' + (hrRes?.items?.length ?? 'null') })
-    if (hrRes?.items?.[0]) healthData.HEART_BPM = Math.round(hrRes.items[0].value)
-  } catch(e) { postToApp('LOG', { message: '[HK] HEART_RATE error: ' + e.message }) }
+    const n = hrRes?.items?.length || 0
+    if (n) { healthData.HEART_BPM = Math.round(hrRes.items[0].value); logSync('Heart Rate', 'ok', n) }
+    else logSync('Heart Rate', 'empty')
+  } catch(e) { logSync('Heart Rate', 'fail', null, e.message) }
 
   // Resting HR
   try {
     const rhrRes = await restRequest('list', 'AppleHealthRecord', {
       user: state.USER.id, type: 'RESTING_HEART_RATE', sort: '-start', limit: 7
     })
-    postToApp('LOG', { message: '[HK] RESTING_HEART_RATE count: ' + (rhrRes?.items?.length ?? 'null') })
-    if (rhrRes?.items?.length) {
+    const n = rhrRes?.items?.length || 0
+    if (n) {
       healthData.RESTING_BPM = Math.round(rhrRes.items[0].value)
-      healthData.RESTING_AVG = Math.round(rhrRes.items.reduce((s,r)=>s+r.value,0) / rhrRes.items.length)
-    }
-  } catch(e) { postToApp('LOG', { message: '[HK] RESTING_HEART_RATE error: ' + e.message }) }
+      healthData.RESTING_AVG = Math.round(rhrRes.items.reduce((s,r)=>s+r.value,0) / n)
+      logSync('Resting Heart Rate', 'ok', n)
+    } else logSync('Resting Heart Rate', 'empty')
+  } catch(e) { logSync('Resting Heart Rate', 'fail', null, e.message) }
 
   // Sleep
   try {
     const sleepRes = await restRequest('list', 'AppleHealthRecord', {
       user: state.USER.id, type: 'SLEEP_SAMPLES', sort: '-start', limit: 30
     })
-    postToApp('LOG', { message: '[HK] SLEEP_SAMPLES count: ' + (sleepRes?.items?.length ?? 'null') })
-    if (sleepRes?.items?.length) {
+    const n = sleepRes?.items?.length || 0
+    if (n) {
       const lastNight = sleepRes.items.filter(r => new Date(r.start) >= yesterdayStart)
       if (lastNight.length) {
         const asleepMin = Math.round(lastNight.filter(r=>r.classification==='ASLEEP').reduce((s,r)=>s+(new Date(r.end)-new Date(r.start))/60000,0))
@@ -1366,8 +1458,9 @@ async function loadHealthData() {
           start: fmt(startT), end: fmt(endT)
         }
       }
-    }
-  } catch(e) { postToApp('LOG', { message: '[HK] SLEEP_SAMPLES error: ' + e.message }) }
+      logSync('Sleep', 'ok', n)
+    } else logSync('Sleep', 'empty')
+  } catch(e) { logSync('Sleep', 'fail', null, e.message) }
 
   // Calories
   try {
@@ -1377,38 +1470,36 @@ async function loadHealthData() {
     const basalRes = await restRequest('list', 'AppleHealthRecord', {
       user: state.USER.id, type: 'BASAL_ENERGY_BURNED', sort: '-start', limit: 50
     })
-    postToApp('LOG', { message: '[HK] ACTIVE_ENERGY count: ' + (activeRes?.items?.length ?? 'null') })
-    postToApp('LOG', { message: '[HK] BASAL_ENERGY count: ' + (basalRes?.items?.length ?? 'null') })
-    const active = activeRes?.items?.length
-      ? Math.round(activeRes.items.filter(r=>new Date(r.start)>=todayStart).reduce((s,r)=>s+(r.value||0),0))
-      : null
-    const basal = basalRes?.items?.length
-      ? Math.round(basalRes.items.filter(r=>new Date(r.start)>=todayStart).reduce((s,r)=>s+(r.value||0),0))
-      : null
+    const na = activeRes?.items?.length || 0
+    const nb = basalRes?.items?.length || 0
+    const active = na ? Math.round(activeRes.items.filter(r=>new Date(r.start)>=todayStart).reduce((s,r)=>s+(r.value||0),0)) : null
+    const basal  = nb ? Math.round(basalRes.items.filter(r=>new Date(r.start)>=todayStart).reduce((s,r)=>s+(r.value||0),0)) : null
     if (active !== null || basal !== null) {
       healthData.CALORIES = { active: active ?? 0, basal: basal ?? 0, activeGoal: 600 }
-    }
-  } catch(e) { postToApp('LOG', { message: '[HK] CALORIES error: ' + e.message }) }
+      logSync('Energy Burned', 'ok', na + nb)
+    } else logSync('Energy Burned', 'empty')
+  } catch(e) { logSync('Energy Burned', 'fail', null, e.message) }
 
   // Water
   try {
     const waterRes = await restRequest('list', 'AppleHealthRecord', {
       user: state.USER.id, type: 'WATER', sort: '-start', limit: 20
     })
-    postToApp('LOG', { message: '[HK] WATER count: ' + (waterRes?.items?.length ?? 'null') })
-    if (waterRes?.items?.length) {
+    const n = waterRes?.items?.length || 0
+    if (n) {
       const totalLitres = waterRes.items.filter(r=>new Date(r.start)>=todayStart).reduce((s,r)=>s+(r.value||0),0)
       healthData.WATER_CUPS = Math.round((totalLitres * 1000) / 240)
-    }
-  } catch(e) { postToApp('LOG', { message: '[HK] WATER error: ' + e.message }) }
+      logSync('Water Intake', 'ok', n)
+    } else logSync('Water Intake', 'empty')
+  } catch(e) { logSync('Water Intake', 'fail', null, e.message) }
 
   // Workouts
   try {
     const woRes = await restRequest('list', 'AppleHealthRecord', {
       user: state.USER.id, type: 'WORKOUT', sort: '-start', limit: 10
     })
-    postToApp('LOG', { message: '[HK] WORKOUT count: ' + (woRes?.items?.length ?? 'null') })
-    if (woRes?.items?.length) {
+    const n = woRes?.items?.length || 0
+    if (n) {
       const fmt = d => {
         const diff = Math.floor((now - new Date(d)) / 86400000)
         if (diff === 0) return 'Today · ' + new Date(d).toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'})
@@ -1421,13 +1512,12 @@ async function loadHealthData() {
         kcal: Math.round(w.calories||0),
         time: fmt(w.start)
       }))
-    }
-  } catch(e) { postToApp('LOG', { message: '[HK] WORKOUT error: ' + e.message }) }
+      logSync('Workouts', 'ok', n)
+    } else logSync('Workouts', 'empty')
+  } catch(e) { logSync('Workouts', 'fail', null, e.message) }
 
   // Goal from CONFIG
   if (state.CONFIG?.step_goal) goal = parseInt(state.CONFIG.step_goal) || 8000
-
-  postToApp('LOG', { message: '[HK] loadHealthData complete' })
 }
 
 // ─── Init messages ────────────────────────────────────────────────────────────
