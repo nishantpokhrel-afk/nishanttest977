@@ -727,12 +727,50 @@
 
   .clearfix::after { content: ''; display: block; clear: both; }
 
-  /* SYNC LOG */
-  .sync-log-header {
+  /* SYNC FAB */
+  .sync-fab {
+    position: fixed;
+    bottom: 20px; right: 20px;
+    width: 32px; height: 32px;
+    border-radius: 50%;
+    background: var(--card);
+    border: 1px solid var(--hair);
+    box-shadow: 0 2px 8px rgba(15,23,34,0.10);
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer;
+    color: var(--muted);
+    z-index: 9;
+    transition: color 0.15s, box-shadow 0.15s;
+  }
+  .sync-fab:hover { color: var(--accent); box-shadow: 0 4px 14px rgba(15,23,34,0.14); }
+
+  /* SYNC PANEL */
+  .sync-panel {
+    position: fixed;
+    bottom: 60px; right: 16px;
+    width: 260px;
+    background: var(--card);
+    border: 1px solid var(--hair);
+    border-radius: 16px;
+    box-shadow: 0 8px 28px rgba(15,23,34,0.13);
+    padding: 14px 16px;
+    z-index: 9;
+    transform: translateY(12px) scale(0.97);
+    transform-origin: bottom right;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.18s, transform 0.18s;
+  }
+  .sync-panel.open {
+    opacity: 1;
+    pointer-events: all;
+    transform: translateY(0) scale(1);
+  }
+  .sync-panel-header {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    margin-bottom: 12px;
+    margin-bottom: 10px;
   }
   .sync-log-time {
     font-size: 10px; font-weight: 600;
@@ -742,27 +780,25 @@
   .sync-log-row {
     display: flex;
     align-items: center;
-    gap: 10px;
-    padding: 8px 0;
+    gap: 8px;
+    padding: 6px 0;
     border-top: 1px solid var(--hair);
   }
   .sync-log-dot {
-    width: 8px; height: 8px;
+    width: 7px; height: 7px;
     border-radius: 50%;
     flex-shrink: 0;
   }
-  .sync-log-dot.ok      { background: #1f8a5b; }
-  .sync-log-dot.fail    { background: #d97757; }
-  .sync-log-dot.empty   { background: var(--muted); }
+  .sync-log-dot.ok    { background: #1f8a5b; }
+  .sync-log-dot.fail  { background: #d97757; }
+  .sync-log-dot.empty { background: var(--muted); }
   .sync-log-name {
-    font-size: 12px; font-weight: 600;
-    color: var(--ink);
-    flex: 1;
+    font-size: 11px; font-weight: 600;
+    color: var(--ink); flex: 1;
   }
   .sync-log-status {
-    font-size: 11px; font-weight: 500;
-    color: var(--muted);
-    text-align: right;
+    font-size: 10px; font-weight: 500;
+    color: var(--muted); text-align: right;
   }
   .sync-log-status.ok   { color: #1f8a5b; }
   .sync-log-status.fail { color: #d97757; }
@@ -996,16 +1032,24 @@
       </div>
     </div>
 
-    <!-- SYNC LOG CARD -->
-    <div class="card" id="syncLogCard">
-      <div class="sync-log-header">
-        <span class="label">Sync Log</span>
-        <span class="sync-log-time" id="syncLogTime">–</span>
-      </div>
-      <div id="syncLogRows"></div>
-    </div>
-
   </div><!-- /scroll-area -->
+
+  <!-- SYNC LOG FLOATING BUTTON -->
+  <button class="sync-fab" id="syncFab" title="Sync log">
+    <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">
+      <circle cx="7" cy="7" r="5.5"/>
+      <path d="M7 5v3.2M7 9.8h.01"/>
+    </svg>
+  </button>
+
+  <!-- SYNC LOG PANEL -->
+  <div class="sync-panel" id="syncPanel">
+    <div class="sync-panel-header">
+      <span class="label">Sync Log</span>
+      <span class="sync-log-time" id="syncLogTime">–</span>
+    </div>
+    <div id="syncLogRows"></div>
+  </div>
 
   <!-- SCRIM -->
   <div class="scrim" id="scrim"></div>
@@ -1463,7 +1507,7 @@ function renderWorkouts() {
 }
 
 function renderSyncLog() {
-  const rows = document.getElementById('syncLogRows')
+  const rows  = document.getElementById('syncLogRows')
   const timeEl = document.getElementById('syncLogTime')
   if (!rows) return
   rows.innerHTML = ''
@@ -1471,7 +1515,7 @@ function renderSyncLog() {
     timeEl.textContent = '–'
     const empty = document.createElement('div')
     empty.className = 'sync-log-row'
-    empty.innerHTML = '<div class="sync-log-dot empty"></div><span class="sync-log-name">No sync attempted yet</span>'
+    empty.innerHTML = '<div class="sync-log-dot empty"></div><span class="sync-log-name">No sync attempted</span>'
     rows.appendChild(empty)
     return
   }
@@ -1480,9 +1524,9 @@ function renderSyncLog() {
     const row = document.createElement('div')
     row.className = 'sync-log-row'
     const statusClass = entry.status === 'ok' ? 'ok' : entry.status === 'empty' ? 'empty' : 'fail'
-    const statusText  = entry.status === 'ok'    ? entry.count + ' record' + (entry.count !== 1 ? 's' : '')
+    const statusText  = entry.status === 'ok'    ? entry.count + ' rec'
                       : entry.status === 'empty' ? 'No data'
-                      : 'Failed — ' + entry.error
+                      : 'Error'
     row.innerHTML = `
       <div class="sync-log-dot ${statusClass}"></div>
       <span class="sync-log-name">${entry.name}</span>
@@ -1564,7 +1608,18 @@ document.querySelectorAll('.chip').forEach(c => {
 
 document.addEventListener('keydown', e => {
   if (e.key === 'Escape' && modalOpen) closeModal()
+  if (e.key === 'Escape') document.getElementById('syncPanel').classList.remove('open')
 })
+
+// Sync FAB toggle
+document.getElementById('syncFab').addEventListener('click', e => {
+  e.stopPropagation()
+  document.getElementById('syncPanel').classList.toggle('open')
+})
+document.addEventListener('click', () => {
+  document.getElementById('syncPanel').classList.remove('open')
+})
+document.getElementById('syncPanel').addEventListener('click', e => e.stopPropagation())
 
 // ─── Health Data Loading ───────────────────────────────────────────────────────
 function logSync(name, status, count, error) {
