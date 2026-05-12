@@ -22,48 +22,21 @@
 
   body {
     font-family: 'Manrope', sans-serif;
-    background: #e8ecf2;
+    background: var(--bg);
     min-height: 100vh;
-    display: flex;
-    align-items: flex-start;
-    justify-content: center;
-    padding: 24px 16px;
     position: relative;
     overflow-x: hidden;
   }
 
-  body::before, body::after {
-    content: '';
-    position: fixed;
-    border-radius: 50%;
-    pointer-events: none;
-    z-index: 0;
-  }
-  body::before {
-    width: 600px; height: 600px;
-    top: -200px; left: -200px;
-    background: radial-gradient(circle, color-mix(in oklab, var(--accent) 10%, white), transparent 70%);
-  }
-  body::after {
-    width: 500px; height: 500px;
-    bottom: -150px; right: -150px;
-    background: radial-gradient(circle, color-mix(in oklab, var(--accent) 8%, white), transparent 70%);
-  }
-
   .phone {
-    width: 390px;
-    min-height: 820px;
+    width: 100%;
+    min-height: 100vh;
     background: var(--bg);
-    border-radius: 24px;
-    box-shadow: 0 24px 80px rgba(15,23,34,0.18), 0 4px 16px rgba(15,23,34,0.08);
     position: relative;
-    overflow: hidden;
-    z-index: 1;
   }
 
   .scroll-area {
-    height: 820px;
-    overflow-y: auto;
+    width: 100%;
     padding: 10px 20px 28px;
     scrollbar-width: none;
   }
@@ -538,7 +511,7 @@
 
   /* MODAL SCRIM */
   .scrim {
-    position: absolute;
+    position: fixed;
     inset: 0;
     background: rgba(15,23,34,0.32);
     backdrop-filter: blur(2px);
@@ -546,7 +519,6 @@
     opacity: 0;
     pointer-events: none;
     transition: opacity 0.22s;
-    border-radius: 24px;
   }
   .scrim.visible {
     opacity: 1;
@@ -555,7 +527,7 @@
 
   /* BOTTOM SHEET */
   .bottom-sheet {
-    position: absolute;
+    position: fixed;
     bottom: 0; left: 0; right: 0;
     background: var(--card);
     border-radius: 24px 24px 0 0;
@@ -688,7 +660,7 @@
 
   /* LOADING */
   .loading-screen {
-    position: absolute;
+    position: fixed;
     inset: 0;
     background: var(--bg);
     display: flex;
@@ -696,7 +668,6 @@
     align-items: center;
     justify-content: center;
     z-index: 20;
-    border-radius: 24px;
     gap: 12px;
     transition: opacity 0.4s;
   }
@@ -1284,6 +1255,9 @@ document.getElementById('setGoalBtn').addEventListener('click', openModal)
 document.getElementById('closeSheet').addEventListener('click', closeModal)
 document.getElementById('scrim').addEventListener('click', closeModal)
 document.getElementById('commitGoalBtn').addEventListener('click', commitGoal)
+document.getElementById('backBtn').addEventListener('click', () => {
+  postToApp('QUIT', { completeState: 'COMPLETE' })
+})
 
 document.getElementById('goalSlider').addEventListener('input', e => {
   updateDraft(parseInt(e.target.value))
