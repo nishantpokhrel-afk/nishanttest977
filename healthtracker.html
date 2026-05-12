@@ -42,41 +42,6 @@
   }
   .scroll-area::-webkit-scrollbar { display: none; }
 
-  /* WEEK NAV */
-  .week-nav {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-  }
-  .week-nav-btn {
-    width: 28px; height: 28px;
-    border-radius: 8px;
-    border: 1px solid var(--hair);
-    background: var(--bg);
-    display: flex; align-items: center; justify-content: center;
-    cursor: pointer;
-    color: var(--ink-2);
-    transition: background 0.15s, color 0.15s;
-    padding: 0;
-  }
-  .week-nav-btn:hover:not(:disabled) {
-    background: color-mix(in oklab, var(--accent) 10%, white);
-    color: var(--accent);
-    border-color: color-mix(in oklab, var(--accent) 30%, white);
-  }
-  .week-nav-btn:disabled {
-    opacity: 0.3;
-    cursor: default;
-  }
-  .week-nav-label {
-    font-size: 10px; font-weight: 700;
-    color: var(--muted);
-    letter-spacing: 0.3px;
-    min-width: 90px;
-    text-align: center;
-    font-variant-numeric: tabular-nums;
-  }
-
   /* LABEL */
   .label {
     font-size: 11px;
@@ -89,7 +54,7 @@
   /* CARDS */
   .card {
     background: var(--card);
-    border-radius: var(--radius-card, 20px);
+    border-radius: 20px;
     border: 1px solid var(--hair);
     padding: 16px 18px;
     margin-bottom: 12px;
@@ -311,7 +276,7 @@
     background: transparent;
     font-family: 'Manrope', sans-serif;
     font-size: 12px; font-weight: 700;
-    border-radius: var(--radius-btn, 12px);
+    border-radius: 12px;
     padding: 8px 14px;
     cursor: pointer;
     transition: background 0.15s;
@@ -680,7 +645,7 @@
   .primary-btn {
     width: 100%;
     padding: 14px;
-    border-radius: var(--radius-btn, 14px);
+    border-radius: 14px;
     border: none;
     background: var(--accent);
     color: white;
@@ -727,50 +692,12 @@
 
   .clearfix::after { content: ''; display: block; clear: both; }
 
-  /* SYNC FAB */
-  .sync-fab {
-    position: fixed;
-    bottom: 20px; right: 20px;
-    width: 32px; height: 32px;
-    border-radius: 50%;
-    background: var(--card);
-    border: 1px solid var(--hair);
-    box-shadow: 0 2px 8px rgba(15,23,34,0.10);
-    display: flex; align-items: center; justify-content: center;
-    cursor: pointer;
-    color: var(--muted);
-    z-index: 9;
-    transition: color 0.15s, box-shadow 0.15s;
-  }
-  .sync-fab:hover { color: var(--accent); box-shadow: 0 4px 14px rgba(15,23,34,0.14); }
-
-  /* SYNC PANEL */
-  .sync-panel {
-    position: fixed;
-    bottom: 60px; right: 16px;
-    width: 260px;
-    background: var(--card);
-    border: 1px solid var(--hair);
-    border-radius: 16px;
-    box-shadow: 0 8px 28px rgba(15,23,34,0.13);
-    padding: 14px 16px;
-    z-index: 9;
-    transform: translateY(12px) scale(0.97);
-    transform-origin: bottom right;
-    opacity: 0;
-    pointer-events: none;
-    transition: opacity 0.18s, transform 0.18s;
-  }
-  .sync-panel.open {
-    opacity: 1;
-    pointer-events: all;
-    transform: translateY(0) scale(1);
-  }
-  .sync-panel-header {
+  /* SYNC LOG */
+  .sync-log-header {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    margin-bottom: 10px;
+    margin-bottom: 12px;
   }
   .sync-log-time {
     font-size: 10px; font-weight: 600;
@@ -780,33 +707,30 @@
   .sync-log-row {
     display: flex;
     align-items: center;
-    gap: 8px;
-    padding: 6px 0;
+    gap: 10px;
+    padding: 8px 0;
     border-top: 1px solid var(--hair);
   }
   .sync-log-dot {
-    width: 7px; height: 7px;
+    width: 8px; height: 8px;
     border-radius: 50%;
     flex-shrink: 0;
   }
-  .sync-log-dot.ok    { background: #1f8a5b; }
-  .sync-log-dot.fail  { background: #d97757; }
-  .sync-log-dot.empty { background: var(--muted); }
+  .sync-log-dot.ok      { background: #1f8a5b; }
+  .sync-log-dot.fail    { background: #d97757; }
+  .sync-log-dot.empty   { background: var(--muted); }
   .sync-log-name {
-    font-size: 11px; font-weight: 600;
-    color: var(--ink); flex: 1;
+    font-size: 12px; font-weight: 600;
+    color: var(--ink);
+    flex: 1;
   }
   .sync-log-status {
-    font-size: 10px; font-weight: 500;
-    color: var(--muted); text-align: right;
+    font-size: 11px; font-weight: 500;
+    color: var(--muted);
+    text-align: right;
   }
   .sync-log-status.ok   { color: #1f8a5b; }
   .sync-log-status.fail { color: #d97757; }
-
-  /* EMPTY STATE - cards hidden until data arrives */
-  #stepsCard, #heartRow, #sleepCard, #energyCard, #waterCard, #workoutsCard {
-    display: none;
-  }
 
   /* SYNC ERROR */
   .sync-error {
@@ -852,22 +776,11 @@
 
     <!-- STEPS CARD -->
     <div class="card" id="stepsCard">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
-        <span class="label">Steps</span>
-        <div class="week-nav">
-          <button class="week-nav-btn" id="weekPrev" title="Previous week">
-            <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M9 2L5 7l4 5"/></svg>
-          </button>
-          <span class="week-nav-label" id="weekRangeLabel">–</span>
-          <button class="week-nav-btn" id="weekNext" title="Next week" disabled>
-            <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M5 2l4 5-4 5"/></svg>
-          </button>
-        </div>
-      </div>
+      <div class="label" style="margin-bottom:6px;">Steps</div>
       <div class="avg-row">
         <span class="label" style="font-size:10px;">Average</span>
         <span class="big-stat big-stat-32" id="avgSteps">–</span>
-        <span class="avg-tag" id="avgTag">Last 7 Days</span>
+        <span class="avg-tag">Last 7 Days</span>
       </div>
 
       <!-- Chart -->
@@ -918,7 +831,7 @@
     </div>
 
     <!-- HEART RATE ROW -->
-    <div class="two-col" id="heartRow">
+    <div class="two-col">
       <div class="card" id="heartCard">
         <span class="label">Heart Rate</span>
         <div class="heart-card-inner" style="margin-top:6px;">
@@ -1004,52 +917,16 @@
       <div id="workoutRows"></div>
     </div>
 
-    <!-- EMPTY STATE -->
-    <div id="emptyState" style="display:none;flex-direction:column;align-items:center;justify-content:center;padding:48px 24px;text-align:center;">
-      <div style="width:64px;height:64px;border-radius:20px;background:color-mix(in oklab,var(--accent) 10%,white);display:flex;align-items:center;justify-content:center;margin-bottom:20px;">
-        <svg width="32" height="32" viewBox="0 0 32 32" fill="none" stroke="var(--accent)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M16 28S4 20 4 11a8 8 0 0 1 12-6.9A8 8 0 0 1 28 11C28 20 16 28 16 28Z"/>
-          <path d="M16 10v5M16 18h.01"/>
-        </svg>
+    <!-- SYNC LOG CARD -->
+    <div class="card" id="syncLogCard">
+      <div class="sync-log-header">
+        <span class="label">Sync Log</span>
+        <span class="sync-log-time" id="syncLogTime">–</span>
       </div>
-      <div style="font-size:18px;font-weight:800;color:var(--ink);letter-spacing:-0.4px;margin-bottom:8px;">No Health Data Found</div>
-      <div style="font-size:13px;font-weight:500;color:var(--muted);line-height:1.6;max-width:260px;">
-        We couldn't find any synced data. To fix this:
-      </div>
-      <div style="margin-top:16px;text-align:left;width:100%;max-width:280px;">
-        <div style="display:flex;gap:10px;align-items:flex-start;margin-bottom:12px;">
-          <div style="width:22px;height:22px;border-radius:50%;background:color-mix(in oklab,var(--accent) 12%,white);color:var(--accent);font-size:11px;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px;">1</div>
-          <div style="font-size:12px;font-weight:600;color:var(--ink-2);line-height:1.5;">Open <strong>iPhone Settings → Privacy & Security → Health</strong> and grant this app access.</div>
-        </div>
-        <div style="display:flex;gap:10px;align-items:flex-start;margin-bottom:12px;">
-          <div style="width:22px;height:22px;border-radius:50%;background:color-mix(in oklab,var(--accent) 12%,white);color:var(--accent);font-size:11px;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px;">2</div>
-          <div style="font-size:12px;font-weight:600;color:var(--ink-2);line-height:1.5;">Open the <strong>Apple Health app</strong> and make sure your data is being recorded.</div>
-        </div>
-        <div style="display:flex;gap:10px;align-items:flex-start;">
-          <div style="width:22px;height:22px;border-radius:50%;background:color-mix(in oklab,var(--accent) 12%,white);color:var(--accent);font-size:11px;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px;">3</div>
-          <div style="font-size:12px;font-weight:600;color:var(--ink-2);line-height:1.5;">Return here and the dashboard will update automatically.</div>
-        </div>
-      </div>
+      <div id="syncLogRows"></div>
     </div>
 
   </div><!-- /scroll-area -->
-
-  <!-- SYNC LOG FLOATING BUTTON -->
-  <button class="sync-fab" id="syncFab" title="Sync log">
-    <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">
-      <circle cx="7" cy="7" r="5.5"/>
-      <path d="M7 5v3.2M7 9.8h.01"/>
-    </svg>
-  </button>
-
-  <!-- SYNC LOG PANEL -->
-  <div class="sync-panel" id="syncPanel">
-    <div class="sync-panel-header">
-      <span class="label">Sync Log</span>
-      <span class="sync-log-time" id="syncLogTime">–</span>
-    </div>
-    <div id="syncLogRows"></div>
-  </div>
 
   <!-- SCRIM -->
   <div class="scrim" id="scrim"></div>
@@ -1128,16 +1005,13 @@ let cups = 5
 let modalOpen = false
 let draft = 8000
 let barsAnimated = false
-let chartWeekOffset = 0  // 0=last 7 days, 1=prev week, 2=two weeks ago
 
 // Sync log entries populated during loadHealthData
 const syncLog = []
 
 // Live health data — null means not synced
 const healthData = {
-  STEP_DAY_MAP: null,   // { 'YYYY-MM-DD': steps } for last 21 days
-  TODAY_STEPS: null,
-  YESTERDAY_STEPS: null,
+  WEEK: null, TODAY_STEPS: null, YESTERDAY_STEPS: null,
   HEART_BPM: null, RESTING_BPM: null, RESTING_AVG: null,
   SLEEP: null, CALORIES: null, WATER_CUPS: null, WORKOUTS: null,
 }
@@ -1150,62 +1024,14 @@ async function applyAppTheme() {
       appId ? restRequest('get', 'App', appId) : Promise.resolve(null),
       restRequest('list', 'Settings', {})
     ])
-
-    const appTheme      = appRes?.theme      || {}
+    const appTheme      = appRes?.theme || {}
     const platformTheme = settingsRes?.items?.[0]?.theme || {}
-
-    const theme = {
-      colors:            Object.assign({}, platformTheme.colors,      appTheme.colors),
-      accentColors:      appTheme.accentColors?.length ? appTheme.accentColors : (platformTheme.accentColors || []),
-      font:              appTheme.font              || platformTheme.font,
-      rounded:           appTheme.rounded           || platformTheme.rounded,
-      borderStyle:       Object.assign({}, platformTheme.borderStyle, appTheme.borderStyle),
-      generalBackground: appTheme.generalBackground || platformTheme.generalBackground,
-      activityHeader:    appTheme.activityHeader    || platformTheme.activityHeader,
+    const colors = Object.assign({}, platformTheme.colors, appTheme.colors)
+    if (colors.primary) {
+      document.documentElement.style.setProperty('--accent', colors.primary)
     }
-
-    const root = document.documentElement
-
-    // ── Colours ──────────────────────────────────────────────────────────────
-    if (theme.colors?.primary)   root.style.setProperty('--accent',  theme.colors.primary)
-    if (theme.colors?.dark)      root.style.setProperty('--ink',     theme.colors.dark)
-    if (theme.colors?.secondary) root.style.setProperty('--ink-2',   theme.colors.secondary)
-    if (theme.colors?.light)     root.style.setProperty('--card',    theme.colors.light)
-
-    // ── Background ───────────────────────────────────────────────────────────
-    if (theme.generalBackground?.color) {
-      root.style.setProperty('--bg', theme.generalBackground.color)
-    }
-    if (theme.activityHeader?.color) {
-      root.style.setProperty('--card', theme.activityHeader.color)
-    }
-
-    // ── Border radius ────────────────────────────────────────────────────────
-    const radiusMap = { NONE: '0px', SMALL: '8px', MEDIUM: '14px', LARGE: '20px', FULL: '9999px' }
-    if (theme.rounded && radiusMap[theme.rounded]) {
-      const r = radiusMap[theme.rounded]
-      root.style.setProperty('--radius-card',   r)
-      root.style.setProperty('--radius-btn',    r)
-    }
-
-    // ── Font ─────────────────────────────────────────────────────────────────
-    const fontMap = {
-      ROBOTO: 'Roboto', OPEN_SANS: 'Open Sans', LATO: 'Lato',
-      MONTSERRAT: 'Montserrat', POPPINS: 'Poppins', NUNITO: 'Nunito',
-      RALEWAY: 'Raleway', INTER: 'Inter', MANROPE: 'Manrope',
-    }
-    if (theme.font && fontMap[theme.font] && theme.font !== 'MANROPE') {
-      const fontName = fontMap[theme.font]
-      const link = document.createElement('link')
-      link.rel  = 'stylesheet'
-      link.href = `https://fonts.googleapis.com/css2?family=${fontName.replace(' ', '+')}:wght@400;600;700;800&display=swap`
-      document.head.appendChild(link)
-      root.style.setProperty('--font', `'${fontName}', sans-serif`)
-      document.body.style.fontFamily = `var(--font)`
-    }
-
   } catch (e) {
-    // Fall back to CSS defaults silently
+    // Fall back to default --accent from CSS
   }
 }
 
@@ -1224,10 +1050,6 @@ function updateSliderStyle() {
   slider.style.background = `linear-gradient(to right, var(--accent) ${pct}%, var(--hair) ${pct}%)`
 }
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
-function show(id) { const el = document.getElementById(id); if (el) el.style.display = '' }
-function hide(id) { const el = document.getElementById(id); if (el) el.style.display = 'none' }
-
 // ─── Render ───────────────────────────────────────────────────────────────────
 function renderAll() {
   renderHeader()
@@ -1237,7 +1059,6 @@ function renderAll() {
   renderEnergy()
   renderWater()
   renderWorkouts()
-  renderEmptyState()
   renderSyncLog()
 }
 
@@ -1247,55 +1068,25 @@ function renderHeader() {
     now.toLocaleDateString('en-US', { weekday:'short', month:'short', day:'numeric' }).toUpperCase()
 }
 
-function renderEmptyState() {
-  const hasAny = Object.values(healthData).some(v => v !== null)
-  const el = document.getElementById('emptyState')
-  if (el) el.style.display = hasAny ? 'none' : 'flex'
-}
-
-// Returns array of 7 {date: Date, dateStr: 'YYYY-MM-DD', label: 'MON 13', v: steps}
-// for the given week offset (0=last 7 days, 1=prev week, 2=two weeks ago)
-function getWeekSlice(offset) {
-  const today = new Date(); today.setHours(0,0,0,0)
-  const days = []
-  for (let i = 6; i >= 0; i--) {
-    const d = new Date(today)
-    d.setDate(d.getDate() - (offset * 7) - i)
-    const dateStr = d.toISOString().slice(0, 10)
-    const label = d.toLocaleDateString('en-US', { weekday:'short' }).slice(0,3).toUpperCase()
-      + ' ' + d.getDate()
-    const v = (healthData.STEP_DAY_MAP && healthData.STEP_DAY_MAP[dateStr]) || 0
-    days.push({ date: d, dateStr, label, v })
-  }
-  return days
-}
-
-function weekRangeText(offset) {
-  if (offset === 0) return 'Last 7 Days'
-  const today = new Date(); today.setHours(0,0,0,0)
-  const end = new Date(today); end.setDate(end.getDate() - offset * 7)
-  const start = new Date(end); start.setDate(start.getDate() - 6)
-  const fmt = d => d.toLocaleDateString('en-US', { month:'short', day:'numeric' })
-  return fmt(start) + ' – ' + fmt(end)
+function syncError(cardId) {
+  const card = document.getElementById(cardId)
+  if (!card || card.querySelector('.sync-error')) return
+  const msg = document.createElement('div')
+  msg.className = 'sync-error'
+  msg.innerHTML = '<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="8" cy="8" r="6.5"/><path d="M8 5v3.5M8 11h.01"/></svg>Sync unsuccessful — check your permissions'
+  card.appendChild(msg)
 }
 
 function renderSteps() {
-  if (healthData.STEP_DAY_MAP === null) { hide('stepsCard'); return }
-  show('stepsCard')
-
-  const week = getWeekSlice(chartWeekOffset)
+  if (healthData.WEEK === null) {
+    syncError('stepsCard')
+    return
+  }
+  const week = healthData.WEEK
   const avg = Math.round(week.reduce((s, d) => s + d.v, 0) / week.length)
   document.getElementById('avgSteps').textContent = fmtNum(avg)
-  document.getElementById('avgTag').textContent = weekRangeText(chartWeekOffset)
-  document.getElementById('weekRangeLabel').textContent = weekRangeText(chartWeekOffset)
-
-  // Nav button states
-  document.getElementById('weekPrev').disabled = chartWeekOffset >= 2
-  document.getElementById('weekNext').disabled = chartWeekOffset <= 0
-
   renderChart(week)
 
-  // Today/yesterday rows only shown for current week
   const today = healthData.TODAY_STEPS ?? 0
   const yest  = healthData.YESTERDAY_STEPS ?? 0
 
@@ -1354,7 +1145,7 @@ function renderChart(week) {
 
     const lbl = document.createElement('div')
     lbl.className = 'chart-xlabel'
-    lbl.textContent = day.label
+    lbl.textContent = day.d
     xlabels.appendChild(lbl)
 
     if (!barsAnimated) {
@@ -1368,32 +1159,15 @@ function renderChart(week) {
 }
 
 function renderHeart() {
-  const hasHeart   = healthData.HEART_BPM !== null
-  const hasResting = healthData.RESTING_BPM !== null
-  const showRow    = hasHeart || hasResting
-
-  const row = document.getElementById('heartRow')
-  if (row) row.style.display = showRow ? '' : 'none'
-
-  if (hasHeart) {
-    show('heartCard')
-    document.getElementById('heartBpm').textContent = fmtNum(healthData.HEART_BPM)
-  } else {
-    hide('heartCard')
-  }
-
-  if (hasResting) {
-    show('restingCard')
-    document.getElementById('restingBpm').textContent = fmtNum(healthData.RESTING_BPM)
-    document.getElementById('restingSub').textContent = '7-day avg · ' + (healthData.RESTING_AVG ?? '–')
-  } else {
-    hide('restingCard')
-  }
+  if (healthData.HEART_BPM === null) { syncError('heartCard'); return }
+  document.getElementById('heartBpm').textContent = fmtNum(healthData.HEART_BPM)
+  if (healthData.RESTING_BPM === null) { syncError('restingCard'); return }
+  document.getElementById('restingBpm').textContent = fmtNum(healthData.RESTING_BPM)
+  document.getElementById('restingSub').textContent = '7-day avg · ' + (healthData.RESTING_AVG ?? '–')
 }
 
 function renderSleep() {
-  if (healthData.SLEEP === null) { hide('sleepCard'); return }
-  show('sleepCard')
+  if (healthData.SLEEP === null) { syncError('sleepCard'); return }
   const sl = healthData.SLEEP
   document.getElementById('sleepTotal').textContent = fmtMin(sl.totalMin)
   document.getElementById('sleepRange').textContent = sl.start + ' – ' + sl.end
@@ -1432,8 +1206,7 @@ function renderSleep() {
 }
 
 function renderEnergy() {
-  if (healthData.CALORIES === null) { hide('energyCard'); return }
-  show('energyCard')
+  if (healthData.CALORIES === null) { syncError('energyCard'); return }
   const c = healthData.CALORIES
   document.getElementById('totalKcal').innerHTML = `${fmtNum(c.active + c.basal)}<span style="font-size:14px;font-weight:600;color:var(--ink-2);margin-left:3px;">kcal</span>`
   document.getElementById('activeKcal').innerHTML = `${fmtNum(c.active)}<span>kcal</span>`
@@ -1449,9 +1222,12 @@ function renderEnergy() {
 }
 
 function renderWater() {
-  if (healthData.WATER_CUPS === null) { hide('waterCard'); return }
-  show('waterCard')
-  const GOAL = 8, ML = 240
+  const GOAL = 8
+  const ML   = 240
+  if (healthData.WATER_CUPS === null) {
+    syncError('waterCard')
+    return
+  }
   cups = healthData.WATER_CUPS
   document.getElementById('waterCups').textContent = `${cups}/${GOAL}`
   document.getElementById('waterMl').textContent   = fmtNum(cups * ML) + ' ml'
@@ -1480,8 +1256,7 @@ function renderWater() {
 }
 
 function renderWorkouts() {
-  if (healthData.WORKOUTS === null) { hide('workoutsCard'); return }
-  show('workoutsCard')
+  if (healthData.WORKOUTS === null) { syncError('workoutsCard'); return }
   const list = healthData.WORKOUTS
   document.getElementById('workoutCount').textContent = `This week · ${list.length} sessions`
 
@@ -1507,7 +1282,7 @@ function renderWorkouts() {
 }
 
 function renderSyncLog() {
-  const rows  = document.getElementById('syncLogRows')
+  const rows = document.getElementById('syncLogRows')
   const timeEl = document.getElementById('syncLogTime')
   if (!rows) return
   rows.innerHTML = ''
@@ -1515,7 +1290,7 @@ function renderSyncLog() {
     timeEl.textContent = '–'
     const empty = document.createElement('div')
     empty.className = 'sync-log-row'
-    empty.innerHTML = '<div class="sync-log-dot empty"></div><span class="sync-log-name">No sync attempted</span>'
+    empty.innerHTML = '<div class="sync-log-dot empty"></div><span class="sync-log-name">No sync attempted yet</span>'
     rows.appendChild(empty)
     return
   }
@@ -1524,9 +1299,9 @@ function renderSyncLog() {
     const row = document.createElement('div')
     row.className = 'sync-log-row'
     const statusClass = entry.status === 'ok' ? 'ok' : entry.status === 'empty' ? 'empty' : 'fail'
-    const statusText  = entry.status === 'ok'    ? entry.count + ' rec'
+    const statusText  = entry.status === 'ok'    ? entry.count + ' record' + (entry.count !== 1 ? 's' : '')
                       : entry.status === 'empty' ? 'No data'
-                      : 'Error'
+                      : 'Failed — ' + entry.error
     row.innerHTML = `
       <div class="sync-log-dot ${statusClass}"></div>
       <span class="sync-log-name">${entry.name}</span>
@@ -1583,21 +1358,6 @@ document.getElementById('backBtn').addEventListener('click', () => {
   postToApp('QUIT', { completeState: 'COMPLETE' })
 })
 
-document.getElementById('weekPrev').addEventListener('click', () => {
-  if (chartWeekOffset < 2) {
-    chartWeekOffset++
-    barsAnimated = false
-    renderSteps()
-  }
-})
-document.getElementById('weekNext').addEventListener('click', () => {
-  if (chartWeekOffset > 0) {
-    chartWeekOffset--
-    barsAnimated = false
-    renderSteps()
-  }
-})
-
 document.getElementById('goalSlider').addEventListener('input', e => {
   updateDraft(parseInt(e.target.value))
 })
@@ -1608,18 +1368,7 @@ document.querySelectorAll('.chip').forEach(c => {
 
 document.addEventListener('keydown', e => {
   if (e.key === 'Escape' && modalOpen) closeModal()
-  if (e.key === 'Escape') document.getElementById('syncPanel').classList.remove('open')
 })
-
-// Sync FAB toggle
-document.getElementById('syncFab').addEventListener('click', e => {
-  e.stopPropagation()
-  document.getElementById('syncPanel').classList.toggle('open')
-})
-document.addEventListener('click', () => {
-  document.getElementById('syncPanel').classList.remove('open')
-})
-document.getElementById('syncPanel').addEventListener('click', e => e.stopPropagation())
 
 // ─── Health Data Loading ───────────────────────────────────────────────────────
 function logSync(name, status, count, error) {
@@ -1638,25 +1387,20 @@ async function loadHealthData() {
   const todayStart = new Date(now); todayStart.setHours(0,0,0,0)
   const yesterdayStart = new Date(todayStart); yesterdayStart.setDate(yesterdayStart.getDate()-1)
 
-  // Steps — fetch 21 days for 3-week scrollable chart
+  // Steps
   try {
-    const threeWeeksAgo = new Date(todayStart)
-    threeWeeksAgo.setDate(threeWeeksAgo.getDate() - 21)
     const stepsRes = await restRequest('list', 'AppleHealthRecord', {
-      user: state.USER.id, type: 'STEP_COUNT', sort: '-start', limit: 150
+      user: state.USER.id, type: 'STEP_COUNT', sort: '-start', limit: 50
     })
     const n = stepsRes?.items?.length || 0
     if (n) {
-      // Build date-keyed map: 'YYYY-MM-DD' -> total steps
       const dayMap = {}
       stepsRes.items.forEach(r => {
-        const d = new Date(r.start)
-        const key = d.toISOString().slice(0, 10)
+        const key = new Date(r.start).toLocaleDateString('en-US', { weekday:'short' }).toUpperCase()
         dayMap[key] = (dayMap[key] || 0) + (r.value || 0)
       })
-      // Round all values
-      Object.keys(dayMap).forEach(k => { dayMap[k] = Math.round(dayMap[k]) })
-      healthData.STEP_DAY_MAP = dayMap
+      const DAYS = ['SUN','MON','TUE','WED','THU','FRI','SAT']
+      healthData.WEEK = DAYS.map(d => ({ d, v: Math.round(dayMap[d] || 0) }))
       healthData.TODAY_STEPS = Math.round(stepsRes.items
         .filter(r => new Date(r.start) >= todayStart)
         .reduce((s, r) => s + (r.value||0), 0))
