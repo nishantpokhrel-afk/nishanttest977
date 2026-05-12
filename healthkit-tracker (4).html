@@ -1545,8 +1545,8 @@ function handleMessage(msg) {
     state[msg.key] = msg.data
   }
 
-  if (REQUIRED.size === received.size || !window.parent || window.parent === window) {
-    // All required data received — start loading
+  // Only boot once all required messages have arrived
+  if (REQUIRED.size === received.size) {
     if (!window._initStarted) {
       window._initStarted = true
       init()
