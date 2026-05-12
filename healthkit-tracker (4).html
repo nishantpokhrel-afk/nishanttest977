@@ -1377,9 +1377,12 @@ function logSync(name, status, count, error) {
 }
 
 async function loadHealthData() {
-  if (!state.USER) return
-
   syncLog.length = 0 // reset on each load
+
+  if (!state.USER) {
+    logSync('All metrics', 'fail', null, 'No user session')
+    return
+  }
   const now = new Date()
   const todayStart = new Date(now); todayStart.setHours(0,0,0,0)
   const yesterdayStart = new Date(todayStart); yesterdayStart.setDate(yesterdayStart.getDate()-1)
@@ -1574,16 +1577,20 @@ document.addEventListener('message', onMessage)
 window.addEventListener('message', onMessage)
 
 // ─── Start ────────────────────────────────────────────────────────────────────
-// Send READY_DYNAMIC_MEDIA only after listeners are registered
+// Listeners must be registered before sending READY_DYNAMIC_MEDIA so no
+// init messages are missed on iOS React Native.
 postToApp('READY_DYNAMIC_MEDIA')
 
-// Standalone fallback (no Cogniss parent)
-setTimeout(() => {
-  if (!window._initStarted) {
-    window._initStarted = true
-    init()
-  }
-}, 1200)
+// Standalone browser preview fallback only — never fires inside Cogniss
+// because isNative is true or window.parent !== window on web.
+if (!isNative && window.parent === window) {
+  setTimeout(() => {
+    if (!window._initStarted) {
+      window._initStarted = true
+      init()
+    }
+  }, 800)
+}
 </script>
 </body>
 </html>
