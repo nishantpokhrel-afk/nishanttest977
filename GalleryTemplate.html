@@ -425,6 +425,7 @@
   <div id="loading">
     <div class="spinner"></div>
     <span>Loading…</span>
+    <button id="clear-cache-btn">Clear cache</button>
   </div>
 
   <!-- Error -->
@@ -573,6 +574,11 @@ function handleRequestResponse(msg) {
 // ─────────────────────────────────────────────
 //  Media — fetch File record and return url
 // ─────────────────────────────────────────────
+
+// Cache-bust token — generated once per page load so every session
+// fetches fresh media URLs, bypassing any stale browser HTTP cache.
+const CACHE_BUST = '?cb=' + Date.now()
+
 const mediaCache = {} // fileId → url
 
 function fetchMedia(fileId, cb) {
@@ -580,7 +586,8 @@ function fetchMedia(fileId, cb) {
   if (mediaCache[fileId] !== undefined) { cb(mediaCache[fileId]); return }
   restRequest('get', 'File', fileId)
     .then(file => {
-      const url = (file && file.url) || null
+      const raw = (file && file.url) || null
+      const url = raw ? raw + CACHE_BUST : null
       mediaCache[fileId] = url
       cb(url)
     })
