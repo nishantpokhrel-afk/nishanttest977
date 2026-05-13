@@ -79,7 +79,6 @@
       flex: 0 0 auto;
       padding: 32px 16px 8px;
       padding-top: max(32px, calc(env(safe-area-inset-top, 0px) + 32px));
-      position: relative;
     }
 
     /* Progress dots */
@@ -104,27 +103,6 @@
     .dot.done {
       background: var(--accent-light);
     }
-    #back-btn {
-      position: absolute;
-      right: 16px;
-      top: max(32px, calc(env(safe-area-inset-top, 0px) + 32px));
-      transform: translateY(-50%);
-      width: 36px;
-      height: 36px;
-      border-radius: 50%;
-      background: rgba(0, 0, 0, 0.20);
-      border: 1.5px solid rgba(255, 255, 255, 0.35);
-      cursor: pointer;
-      font-size: 18px;
-      color: #fff;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      line-height: 1;
-      transition: background 0.15s;
-      -webkit-tap-highlight-color: transparent;
-    }
-    #back-btn:hover { background: rgba(0, 0, 0, 0.35); }
 
     /* Activity label */
     #activity-label {
@@ -617,15 +595,6 @@ function renderProgress() {
     d.className = 'dot' + (i === state.currentIndex ? ' active' : i < state.currentIndex ? ' done' : '')
     dots.appendChild(d)
   })
-  // Back button
-  const back = document.createElement('button')
-  back.id = 'back-btn'
-  back.title = 'Close'
-  back.innerHTML = `<svg width="10" height="16" viewBox="0 0 10 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-    <path d="M8.5 1.5L1.5 8L8.5 14.5" stroke="white" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
-  </svg>`
-  back.onclick = () => postToApp('QUIT', { completeState: 'INCOMPLETE' })
-  dots.appendChild(back)
 }
 
 function renderQuestion(idx) {
