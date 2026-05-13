@@ -316,13 +316,57 @@
       flex-direction: column;
       align-items: center;
       justify-content: center;
-      padding: 32px;
+      padding: 40px 32px;
       text-align: center;
-      gap: 12px;
+      gap: 16px;
       background: var(--surface);
       z-index: 99;
     }
-    #error-view p { color: var(--text-secondary); font-size: 14px; }
+    #error-icon {
+      width: 64px; height: 64px;
+      border-radius: 50%;
+      background: #fef2f2;
+      display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0;
+    }
+    #error-icon svg { display: block; }
+    #error-title {
+      font-size: 18px;
+      font-weight: 700;
+      color: var(--text-primary);
+    }
+    #error-msg {
+      color: var(--text-secondary);
+      font-size: 14px;
+      line-height: 1.5;
+      max-width: 280px;
+    }
+    #error-retry-btn {
+      margin-top: 4px;
+      padding: 13px 32px;
+      border-radius: var(--radius-btn);
+      border: none;
+      background: var(--accent);
+      color: #fff;
+      font-size: 15px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: opacity 0.15s;
+    }
+    #error-retry-btn:active { opacity: 0.8; }
+    #error-close-btn {
+      background: none;
+      border: none;
+      color: var(--text-secondary);
+      font-size: 14px;
+      cursor: pointer;
+      text-decoration: underline;
+      padding: 4px;
+    }
+    /* Inline submission error toast */
+    #feedback-banner.error {
+      color: #c0392b;
+    }
 
     /* ── Transitions ── */
     .slide-in {
@@ -345,7 +389,17 @@
 
   <!-- Error -->
   <div id="error-view">
-    <p id="error-msg">Something went wrong. Please try again.</p>
+    <div id="error-icon">
+      <svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <circle cx="16" cy="16" r="14" stroke="#e74c3c" stroke-width="2.5"/>
+        <line x1="16" y1="9" x2="16" y2="18" stroke="#e74c3c" stroke-width="2.5" stroke-linecap="round"/>
+        <circle cx="16" cy="23" r="1.5" fill="#e74c3c"/>
+      </svg>
+    </div>
+    <div id="error-title">Something went wrong</div>
+    <p id="error-msg">We couldn't load this activity. Please check your connection and try again.</p>
+    <button id="error-retry-btn">Try again</button>
+    <button id="error-close-btn">Close activity</button>
   </div>
 
   <!-- Header -->
@@ -772,11 +826,39 @@ function hideLoading() {
   document.getElementById('loading').style.display = 'none'
 }
 
-function showError(msg) {
+// error types: 'init' (full-screen), 'submit' (inline toast)
+function showError(msg, type = 'init') {
+  if (type === 'submit') {
+    // Inline toast in the feedback banner
+    const banner = document.getElementById('feedback-banner')
+    banner.textContent = '⚠ ' + msg
+    banner.classList.add('error')
+    // Re-enable the continue button so user can retry
+    updateContinueBtn()
+    return
+  }
+  // Full-screen error
+  hideLoading()
   document.getElementById('error-msg').textContent = msg
   const ev = document.getElementById('error-view')
   ev.style.display = 'flex'
+  postToApp('ERROR', { message: msg })
 }
+
+// Wire up retry and close buttons
+document.getElementById('error-retry-btn').addEventListener('click', () => {
+  // Hide error, show loading, re-send ready signal
+  document.getElementById('error-view').style.display = 'none'
+  document.getElementById('loading').style.display = 'flex'
+  received.clear()
+  state.ready = false
+  state.questions = null
+  postToApp('READY_DYNAMIC_MEDIA')
+})
+
+document.getElementById('error-close-btn').addEventListener('click', () => {
+  postToApp('QUIT', { completeState: 'INCOMPLETE' })
+})
 
 function setFeedback(text) {
   document.getElementById('feedback-banner').textContent = text
