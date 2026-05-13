@@ -77,14 +77,16 @@
     /* ── Header ── */
     #header {
       flex: 0 0 auto;
-      padding: 20px 16px 8px;
-      padding-top: max(20px, calc(env(safe-area-inset-top, 0px) + 20px));
+      padding: 32px 16px 8px;
+      padding-top: max(32px, calc(env(safe-area-inset-top, 0px) + 32px));
+      position: relative;
     }
 
     /* Progress dots */
     #progress-dots {
       display: flex;
       align-items: center;
+      justify-content: center;
       gap: 5px;
       margin-bottom: 0;
     }
@@ -103,8 +105,8 @@
       background: var(--accent-light);
     }
     #back-btn {
-      margin-left: auto;
-      flex-shrink: 0;
+      position: absolute;
+      right: 16px;
       background: none;
       border: none;
       cursor: pointer;
@@ -122,6 +124,7 @@
       font-weight: 700;
       padding: 10px 16px 4px;
       flex: 0 0 auto;
+      text-align: center;
     }
 
     /* ── Scrollable content area ── */
@@ -174,14 +177,18 @@
     #app.image-mode #footer { position: relative; z-index: 1; }
     #app.image-mode #feedback-banner { position: relative; z-index: 1; }
 
-    /* Text card pinned at bottom of content area */
-    .image-text-card {
-      background: rgba(255,255,255,0.15);
-      backdrop-filter: blur(12px);
-      -webkit-backdrop-filter: blur(12px);
-      border: 1px solid rgba(255,255,255,0.25);
+    /* ── Shared content card — used by all page types ── */
+    .content-card {
+      background: rgba(0, 0, 0, 0.45);
       border-radius: var(--radius-card);
-      padding: 20px 20px;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    /* IMAGE_CONTENT text inside the card */
+    .image-text-card {
       color: #fff;
       font-size: 17px;
       font-weight: 600;
@@ -207,33 +214,8 @@
     }
     .image-placeholder svg { opacity: 0.4; }
 
-    /* ── MULTICHOICE / MULTISELECT image thumbnail ── */
-    .image-thumbnail {
-      width: 100%;
-      aspect-ratio: 16/9;
-      border-radius: var(--radius-card);
-      background: var(--card-bg);
-      overflow: hidden;
-    }
-    .image-thumbnail img {
-      width: 100%; height: 100%;
-      object-fit: cover;
-      object-position: center;
-      display: block;
-    }
-
     /* ── MULTICHOICE / MULTISELECT block ── */
     .choice-block {
-      display: flex;
-      flex-direction: column;
-      gap: 10px;
-    }
-
-    /* Semi-transparent black container wrapping face label + options */
-    .choice-inner {
-      background: rgba(0, 0, 0, 0.10);
-      border-radius: 16px;
-      padding: 14px 16px;
       display: flex;
       flex-direction: column;
       gap: 10px;
@@ -684,7 +666,7 @@ function renderImageContent(q, area) {
   // Text card at the bottom
   if (q.text) {
     const card = document.createElement('div')
-    card.className = 'image-text-card'
+    card.className = 'content-card image-text-card'
     card.textContent = q.text
     area.appendChild(card)
   }
@@ -697,9 +679,9 @@ function renderChoiceContent(q, area) {
   const wrap = document.createElement('div')
   wrap.className = 'choice-block'
 
-  // Semi-transparent container wrapping face label + options
+  // Shared card container wrapping face label + options
   const inner = document.createElement('div')
-  inner.className = 'choice-inner'
+  inner.className = 'content-card'
 
   // Face label
   if (q.text) {
