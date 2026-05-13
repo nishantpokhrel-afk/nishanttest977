@@ -189,7 +189,7 @@
       text-shadow: 0 1px 3px rgba(0,0,0,0.3);
     }
 
-    /* IMAGE_CONTENT content area fills remaining space, card sits at bottom */
+    /* IMAGE_CONTENT and choice blocks: content area fills space, card sits at bottom */
     #app.image-mode #content-area {
       display: flex;
       flex-direction: column;
@@ -228,20 +228,31 @@
       gap: 10px;
     }
 
+    /* Semi-transparent black container wrapping face label + options */
+    .choice-inner {
+      background: rgba(0, 0, 0, 0.10);
+      border-radius: 16px;
+      padding: 14px 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
     .choice-face-label {
       font-size: 15px;
       font-weight: 600;
       color: var(--text-primary);
-      background: var(--surface);
-      border: 1.5px solid var(--option-border);
+      background: rgba(255, 255, 255, 0.92);
       border-radius: 10px;
       padding: 10px 14px;
-      margin-bottom: 2px;
     }
 
     .option-btn {
-      width: 100%;
-      padding: 14px 20px;
+      display: inline-flex;
+      align-self: center;
+      min-width: 60%;
+      max-width: 100%;
+      padding: 13px 28px;
       border-radius: var(--radius-btn);
       border: 2px solid var(--option-border);
       background: var(--option-bg);
@@ -259,13 +270,15 @@
       border-color: var(--option-selected);
       color: var(--option-selected-text);
     }
-    /* multiselect has a checkmark */
+    /* multiselect has a checkmark — full width to align checks */
     .option-btn.multiselect {
+      align-self: stretch;
       display: flex;
       align-items: center;
       gap: 10px;
       text-align: left;
       border-radius: 14px;
+      padding: 13px 16px;
     }
     .option-btn.multiselect .check-icon {
       width: 20px; height: 20px;
@@ -621,38 +634,42 @@ function renderQuestion(idx) {
   setFeedback('')
   updateContinueBtn()
 
-  // Clear image-mode when not an IMAGE_CONTENT block
-  if (q.type !== 'IMAGE_CONTENT') {
-    document.getElementById('app').classList.remove('image-mode')
-    document.getElementById('page-bg').style.display = 'none'
-  }
+  // All pages use the full-bleed image background
+  setPageBackground(q.image)
 
   if (q.type === 'IMAGE_CONTENT') renderImageContent(q, area)
   else renderChoiceContent(q, area)
 }
 
-// ── IMAGE_CONTENT ──
-function renderImageContent(q, area) {
+// Sets the full-page background image. If this question has no image,
+// keeps whatever was previously showing (carry-over from last block).
+function setPageBackground(imageId) {
   const app = document.getElementById('app')
   const pageBg = document.getElementById('page-bg')
-
   app.classList.add('image-mode')
   pageBg.style.display = 'block'
 
-  // Remove any previous image in the bg
-  const existing = pageBg.querySelector('img')
-  if (existing) existing.remove()
+  if (!imageId) return // keep previous bg
 
-  if (q.image) {
-    fetchMedia(q.image, url => {
-      if (!url) return
-      const img = document.createElement('img')
-      img.src = url
-      img.alt = ''
-      pageBg.insertBefore(img, pageBg.firstChild)
-    })
-  }
+  // Avoid re-fetching if same image is already showing
+  const current = pageBg.querySelector('img')
+  if (current && current.dataset.fileId === imageId) return
 
+  fetchMedia(imageId, url => {
+    if (!url) return
+    // Remove old image
+    const old = pageBg.querySelector('img')
+    if (old) old.remove()
+    const img = document.createElement('img')
+    img.dataset.fileId = imageId
+    img.src = url
+    img.alt = ''
+    pageBg.insertBefore(img, pageBg.firstChild)
+  })
+}
+
+// ── IMAGE_CONTENT ──
+function renderImageContent(q, area) {
   // Text card at the bottom
   if (q.text) {
     const card = document.createElement('div')
@@ -669,30 +686,16 @@ function renderChoiceContent(q, area) {
   const wrap = document.createElement('div')
   wrap.className = 'choice-block'
 
-  // Face label (the question text shown in a box at top)
+  // Semi-transparent container wrapping face label + options
+  const inner = document.createElement('div')
+  inner.className = 'choice-inner'
+
+  // Face label
   if (q.text) {
     const lbl = document.createElement('div')
     lbl.className = 'choice-face-label'
     lbl.textContent = q.text
-    wrap.appendChild(lbl)
-  }
-
-  // Image thumbnail (optional, for MULTICHOICE/MULTISELECT)
-  if (q.image) {
-    const thumb = document.createElement('div')
-    thumb.className = 'image-thumbnail'
-    thumb.style.marginBottom = '8px'
-    thumb.appendChild(imagePlaceholderSVG())
-    wrap.insertBefore(thumb, wrap.firstChild)
-
-    fetchMedia(q.image, url => {
-      if (!url) return
-      const img = document.createElement('img')
-      img.src = url
-      img.alt = ''
-      thumb.innerHTML = ''
-      thumb.appendChild(img)
-    })
+    inner.appendChild(lbl)
   }
 
   // Init selection state
@@ -723,11 +726,9 @@ function renderChoiceContent(q, area) {
       if (q.type === 'MULTICHOICE') {
         sel.selected.clear()
         sel.selected.add(opt._id)
-        // update all btns
-        wrap.querySelectorAll('.option-btn').forEach(b => b.classList.remove('selected'))
+        inner.querySelectorAll('.option-btn').forEach(b => b.classList.remove('selected'))
         btn.classList.add('selected')
       } else {
-        // MULTISELECT toggle
         if (sel.selected.has(opt._id)) {
           sel.selected.delete(opt._id)
           btn.classList.remove('selected')
@@ -739,9 +740,10 @@ function renderChoiceContent(q, area) {
       updateContinueBtn()
     })
 
-    wrap.appendChild(btn)
+    inner.appendChild(btn)
   })
 
+  wrap.appendChild(inner)
   area.appendChild(wrap)
 }
 
