@@ -602,10 +602,6 @@ function init() {
     return
   }
 
-  // Set activity label
-  const label = (state.activity && state.activity.name) || 'Onboarding'
-  document.getElementById('activity-label').textContent = label
-
   renderProgress()
   renderQuestion(state.currentIndex)
 }
@@ -638,6 +634,9 @@ function renderQuestion(idx) {
 
   setFeedback('')
   updateContinueBtn()
+
+  // Update title from the question's data label
+  document.getElementById('activity-label').textContent = q.label || q.dataLabel || ''
 
   // All pages use the full-bleed image background
   setPageBackground(q.image)
