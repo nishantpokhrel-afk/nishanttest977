@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
   <title>Onboarding Template</title>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -78,6 +78,7 @@
     #header {
       flex: 0 0 auto;
       padding: 14px 16px 8px;
+      padding-top: max(14px, env(safe-area-inset-top, 14px));
     }
 
     /* Progress dots */
@@ -239,12 +240,12 @@
     }
 
     .choice-face-label {
-      font-size: 15px;
+      font-size: 17px;
       font-weight: 600;
-      color: var(--text-primary);
-      background: rgba(255, 255, 255, 0.92);
-      border-radius: 10px;
-      padding: 10px 14px;
+      color: #fff;
+      text-align: center;
+      text-shadow: 0 1px 3px rgba(0,0,0,0.3);
+      padding: 4px 0 2px;
     }
 
     .option-btn {
@@ -254,9 +255,9 @@
       max-width: 100%;
       padding: 13px 28px;
       border-radius: var(--radius-btn);
-      border: 2px solid var(--option-border);
-      background: var(--option-bg);
-      color: var(--text-primary);
+      border: 2px solid rgba(255, 255, 255, 0.7);
+      background: transparent;
+      color: #fff;
       font-size: 15px;
       font-weight: 500;
       cursor: pointer;
@@ -266,9 +267,9 @@
     }
     .option-btn:active { transform: scale(0.97); }
     .option-btn.selected {
-      background: var(--option-selected);
-      border-color: var(--option-selected);
-      color: var(--option-selected-text);
+      background: rgba(255, 255, 255, 0.95);
+      border-color: transparent;
+      color: var(--text-primary);
     }
     /* multiselect has a checkmark — full width to align checks */
     .option-btn.multiselect {
@@ -283,20 +284,20 @@
     .option-btn.multiselect .check-icon {
       width: 20px; height: 20px;
       border-radius: 50%;
-      border: 2px solid var(--option-border);
+      border: 2px solid rgba(255, 255, 255, 0.7);
       flex-shrink: 0;
       display: flex; align-items: center; justify-content: center;
       transition: background 0.15s, border-color 0.15s;
     }
     .option-btn.multiselect.selected .check-icon {
-      background: var(--option-selected-text);
-      border-color: var(--option-selected-text);
+      background: var(--text-primary);
+      border-color: var(--text-primary);
     }
     .option-btn.multiselect.selected .check-icon::after {
       content: '';
       width: 6px; height: 10px;
-      border-right: 2px solid var(--option-selected);
-      border-bottom: 2px solid var(--option-selected);
+      border-right: 2px solid #fff;
+      border-bottom: 2px solid #fff;
       transform: rotate(45deg) translate(-1px, -1px);
       display: block;
     }
@@ -318,6 +319,7 @@
     #footer {
       flex: 0 0 auto;
       padding: 8px 16px 20px;
+      padding-bottom: max(20px, env(safe-area-inset-bottom, 20px));
     }
     #continue-btn {
       width: 100%;
