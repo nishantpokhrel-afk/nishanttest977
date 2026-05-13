@@ -131,34 +131,73 @@
       -webkit-overflow-scrolling: touch;
     }
 
-    /* ── IMAGE_CONTENT block ── */
-    .image-block {
-      display: flex;
-      flex-direction: column;
-      gap: 12px;
-    }
-
-    .image-label {
-      font-size: 13px;
-      color: var(--text-secondary);
-      font-weight: 500;
-      margin-top: 4px;
-    }
-
-    .image-thumbnail {
-      width: 100%;
-      aspect-ratio: 16/9;
-      border-radius: var(--radius-card);
+    /* ── Page-level background image (IMAGE_CONTENT) ── */
+    #page-bg {
+      position: absolute;
+      inset: 0;
+      z-index: 0;
       background: var(--card-bg);
-      overflow: hidden;
-      position: relative;
+      transition: opacity 0.4s;
     }
-    .image-thumbnail img {
+    #page-bg img {
       width: 100%; height: 100%;
       object-fit: cover;
       object-position: center;
       display: block;
     }
+    #page-bg-overlay {
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(
+        to bottom,
+        rgba(0,0,0,0.25) 0%,
+        rgba(0,0,0,0.05) 40%,
+        rgba(0,0,0,0.55) 75%,
+        rgba(0,0,0,0.75) 100%
+      );
+    }
+
+    /* When image-mode is active, make header text white */
+    #app.image-mode #header,
+    #app.image-mode #activity-label {
+      position: relative;
+      z-index: 1;
+      color: #fff;
+    }
+    #app.image-mode .dot { background: rgba(255,255,255,0.4); }
+    #app.image-mode .dot.active { background: #fff; }
+    #app.image-mode .dot.done { background: rgba(255,255,255,0.65); }
+    #app.image-mode #back-btn { color: #fff; }
+    #app.image-mode #back-btn:hover { background: rgba(255,255,255,0.15); }
+    #app.image-mode #content-area { position: relative; z-index: 1; }
+    #app.image-mode #footer { position: relative; z-index: 1; }
+    #app.image-mode #feedback-banner { position: relative; z-index: 1; }
+
+    /* Text card pinned at bottom of content area */
+    .image-text-card {
+      background: rgba(255,255,255,0.15);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border: 1px solid rgba(255,255,255,0.25);
+      border-radius: var(--radius-card);
+      padding: 20px 20px;
+      color: #fff;
+      font-size: 17px;
+      font-weight: 600;
+      line-height: 1.5;
+      text-align: center;
+      text-shadow: 0 1px 3px rgba(0,0,0,0.3);
+    }
+
+    /* IMAGE_CONTENT content area fills remaining space, card sits at bottom */
+    #app.image-mode #content-area {
+      display: flex;
+      flex-direction: column;
+      justify-content: flex-end;
+      padding-bottom: 8px;
+    }
+
+    /* placeholder for when image hasn't loaded yet */
     .image-placeholder {
       width: 100%; height: 100%;
       display: flex;
@@ -167,41 +206,19 @@
     }
     .image-placeholder svg { opacity: 0.4; }
 
-    /* Full-bleed background card with text overlay */
-    .image-bg-card {
+    /* ── MULTICHOICE / MULTISELECT image thumbnail ── */
+    .image-thumbnail {
       width: 100%;
+      aspect-ratio: 16/9;
       border-radius: var(--radius-card);
       background: var(--card-bg);
       overflow: hidden;
-      position: relative;
-      min-height: 180px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      margin-top: 4px;
     }
-    .image-bg-card img.bg-img {
-      position: absolute;
-      inset: 0;
+    .image-thumbnail img {
       width: 100%; height: 100%;
       object-fit: cover;
       object-position: center;
-    }
-    .image-bg-overlay {
-      position: absolute;
-      inset: 0;
-      background: var(--overlay-bg);
-    }
-    .image-bg-text {
-      position: relative;
-      z-index: 1;
-      color: #fff;
-      text-align: center;
-      font-size: 17px;
-      font-weight: 600;
-      padding: 24px 20px;
-      line-height: 1.4;
-      text-shadow: 0 1px 4px rgba(0,0,0,0.4);
+      display: block;
     }
 
     /* ── MULTICHOICE / MULTISELECT block ── */
@@ -381,6 +398,11 @@
 <body>
 <div id="app">
 
+  <!-- Full-page background image (used for IMAGE_CONTENT) -->
+  <div id="page-bg" style="display:none">
+    <div id="page-bg-overlay"></div>
+  </div>
+
   <!-- Loading -->
   <div id="loading">
     <div class="spinner"></div>
@@ -459,8 +481,6 @@ const state = {
   // per-question selections
   // Map<questionId, { type, selected: Set<optionId> }>
   selections: new Map(),
-  // media cache: Map<mediaId, objectURL | null>
-  mediaCache: new Map(),
 }
 
 // required init keys before we render
@@ -491,9 +511,9 @@ function handleMessage(msg) {
       handleAnswerResult(msg.data)
       break
 
-    // REST_REQUEST result for media fetch
+    // REST_REQUEST results — routed by correlation id
     case 'REQUEST_RESPONSE':
-      handleMediaResponse(msg)
+      handleRequestResponse(msg)
       break
   }
 }
@@ -509,37 +529,54 @@ function checkReady() {
 }
 
 // ─────────────────────────────────────────────
-//  Media
+//  REST_REQUEST — promise-based helper
 // ─────────────────────────────────────────────
-const pendingMediaCallbacks = new Map() // requestId → callback
+let _reqId = 0
+const _pending = {}
 
-function fetchMedia(mediaId, cb) {
-  if (state.mediaCache.has(mediaId)) { cb(state.mediaCache.get(mediaId)); return }
-  const id = 'media-' + mediaId
-  pendingMediaCallbacks.set(id, cb)
-  postToApp('REST_REQUEST', {
-    id,
-    method: 'GET',
-    path: `/api/media/${mediaId}`,
+function restRequest(method, model, data) {
+  return new Promise((resolve, reject) => {
+    const id = 'req-' + (++_reqId)
+    _pending[id] = { resolve, reject }
+    const text = JSON.stringify({ key: 'REST_REQUEST', method, model, data, id, specialParams: null })
+    if (isNative) window.ReactNativeWebView.postMessage(text)
+    else window.parent.postMessage(text, '*')
   })
 }
 
-function handleMediaResponse(msg) {
-  const cb = pendingMediaCallbacks.get(msg.id)
-  if (!cb) return
-  pendingMediaCallbacks.delete(msg.id)
-  if (msg.error || !msg.data) { cb(null); return }
-  // data may have a url field
-  const url = msg.data.url || msg.data.location || null
-  const mediaId = msg.id.replace('media-', '')
-  state.mediaCache.set(mediaId, url)
-  cb(url)
+function handleRequestResponse(msg) {
+  const p = _pending[msg.id]
+  if (!p) return
+  delete _pending[msg.id]
+  if (msg.error) p.reject(new Error(msg.error))
+  else p.resolve(msg.data)
+}
+
+// ─────────────────────────────────────────────
+//  Media — fetch File record and return url
+// ─────────────────────────────────────────────
+const mediaCache = {} // fileId → url
+
+function fetchMedia(fileId, cb) {
+  if (!fileId) { cb(null); return }
+  if (mediaCache[fileId] !== undefined) { cb(mediaCache[fileId]); return }
+  restRequest('get', 'File', fileId)
+    .then(file => {
+      const url = (file && file.url) || null
+      mediaCache[fileId] = url
+      cb(url)
+    })
+    .catch(() => {
+      mediaCache[fileId] = null
+      cb(null)
+    })
 }
 
 // ─────────────────────────────────────────────
 //  Init & render
 // ─────────────────────────────────────────────
 function init() {
+  clearTimeout(initTimeout)
   hideLoading()
 
   if (!state.questions || state.questions.length === 0) {
@@ -579,11 +616,16 @@ function renderQuestion(idx) {
   const area = document.getElementById('content-area')
   area.innerHTML = ''
   area.className = 'slide-in'
-  // reset animation
   void area.offsetWidth
 
   setFeedback('')
   updateContinueBtn()
+
+  // Clear image-mode when not an IMAGE_CONTENT block
+  if (q.type !== 'IMAGE_CONTENT') {
+    document.getElementById('app').classList.remove('image-mode')
+    document.getElementById('page-bg').style.display = 'none'
+  }
 
   if (q.type === 'IMAGE_CONTENT') renderImageContent(q, area)
   else renderChoiceContent(q, area)
@@ -591,76 +633,34 @@ function renderQuestion(idx) {
 
 // ── IMAGE_CONTENT ──
 function renderImageContent(q, area) {
-  const wrap = document.createElement('div')
-  wrap.className = 'image-block'
+  const app = document.getElementById('app')
+  const pageBg = document.getElementById('page-bg')
 
-  // Top image (thumbnail)
+  app.classList.add('image-mode')
+  pageBg.style.display = 'block'
+
+  // Remove any previous image in the bg
+  const existing = pageBg.querySelector('img')
+  if (existing) existing.remove()
+
   if (q.image) {
-    const lbl = document.createElement('div')
-    lbl.className = 'image-label'
-    lbl.textContent = 'Image from content block'
-    wrap.appendChild(lbl)
-
-    const thumb = document.createElement('div')
-    thumb.className = 'image-thumbnail'
-    thumb.appendChild(imagePlaceholderSVG())
-    wrap.appendChild(thumb)
-
     fetchMedia(q.image, url => {
       if (!url) return
       const img = document.createElement('img')
       img.src = url
-      img.alt = q.text || ''
-      thumb.innerHTML = ''
-      thumb.appendChild(img)
+      img.alt = ''
+      pageBg.insertBefore(img, pageBg.firstChild)
     })
   }
 
-  // Background card with text overlay (the lower section from the wireframe)
+  // Text card at the bottom
   if (q.text) {
     const card = document.createElement('div')
-    card.className = 'image-bg-card'
-
-    if (q.image) {
-      // reuse same image as background
-      const existing = state.mediaCache.get(q.image)
-      if (existing) {
-        const bg = document.createElement('img')
-        bg.className = 'bg-img'
-        bg.src = existing
-        card.appendChild(bg)
-        const ov = document.createElement('div')
-        ov.className = 'image-bg-overlay'
-        card.appendChild(ov)
-      } else {
-        fetchMedia(q.image, url => {
-          if (!url) return
-          const bg = document.createElement('img')
-          bg.className = 'bg-img'
-          bg.src = url
-          card.insertBefore(bg, card.firstChild)
-          const ov = document.createElement('div')
-          ov.className = 'image-bg-overlay'
-          card.insertBefore(ov, card.children[1] || null)
-        })
-      }
-    } else {
-      // Plain overlay without image
-      const ov = document.createElement('div')
-      ov.className = 'image-bg-overlay'
-      card.appendChild(ov)
-    }
-
-    const txt = document.createElement('div')
-    txt.className = 'image-bg-text'
-    txt.textContent = q.text
-    card.appendChild(txt)
-    wrap.appendChild(card)
+    card.className = 'image-text-card'
+    card.textContent = q.text
+    area.appendChild(card)
   }
 
-  area.appendChild(wrap)
-
-  // IMAGE_CONTENT needs no selection — continue always active
   updateContinueBtn(true)
 }
 
@@ -677,18 +677,13 @@ function renderChoiceContent(q, area) {
     wrap.appendChild(lbl)
   }
 
-  // Image (thumbnail above options)
+  // Image thumbnail (optional, for MULTICHOICE/MULTISELECT)
   if (q.image) {
-    const lbl2 = document.createElement('div')
-    lbl2.className = 'image-label'
-    lbl2.textContent = 'Image from content block'
-    wrap.insertBefore(lbl2, wrap.firstChild)
-
     const thumb = document.createElement('div')
     thumb.className = 'image-thumbnail'
     thumb.style.marginBottom = '8px'
     thumb.appendChild(imagePlaceholderSVG())
-    wrap.insertBefore(thumb, lbl2.nextSibling)
+    wrap.insertBefore(thumb, wrap.firstChild)
 
     fetchMedia(q.image, url => {
       if (!url) return
@@ -803,6 +798,8 @@ function handleAnswerResult(data) {
   if (data && data.correct !== undefined) {
     setFeedback(data.correct ? '✓ Correct!' : 'Moving on…')
     setTimeout(advance, 600)
+  } else if (data && data.error) {
+    showError("Your answer couldn't be saved. Please try again.", 'submit')
   } else {
     advance()
   }
@@ -861,7 +858,9 @@ document.getElementById('error-close-btn').addEventListener('click', () => {
 })
 
 function setFeedback(text) {
-  document.getElementById('feedback-banner').textContent = text
+  const banner = document.getElementById('feedback-banner')
+  banner.textContent = text
+  if (!text) banner.classList.remove('error')
 }
 
 function imagePlaceholderSVG() {
@@ -881,10 +880,15 @@ function imagePlaceholderSVG() {
   return wrap
 }
 
-// ─────────────────────────────────────────────
-//  Boot
-// ─────────────────────────────────────────────
+// Boot
 postToApp('READY_DYNAMIC_MEDIA')
+
+// Timeout — if required init messages never arrive, show an error
+const initTimeout = setTimeout(() => {
+  if (!state.ready) {
+    showError('This activity took too long to load. Please close and try again.')
+  }
+}, 10000)
 </script>
 </body>
 </html>
