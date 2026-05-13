@@ -77,8 +77,8 @@
     /* ── Header ── */
     #header {
       flex: 0 0 auto;
-      padding: 14px 16px 8px;
-      padding-top: max(14px, env(safe-area-inset-top, 14px));
+      padding: 20px 16px 8px;
+      padding-top: max(20px, calc(env(safe-area-inset-top, 0px) + 20px));
     }
 
     /* Progress dots */
@@ -318,12 +318,15 @@
     /* ── Footer ── */
     #footer {
       flex: 0 0 auto;
-      padding: 8px 16px 20px;
-      padding-bottom: max(20px, env(safe-area-inset-bottom, 20px));
+      padding: 8px 16px 32px;
+      padding-bottom: max(32px, calc(env(safe-area-inset-bottom, 0px) + 20px));
+      display: flex;
+      justify-content: center;
     }
     #continue-btn {
-      width: 100%;
-      padding: 15px;
+      width: auto;
+      min-width: 160px;
+      padding: 15px 40px;
       border-radius: var(--radius-btn);
       border: none;
       background: var(--continue-bg);
