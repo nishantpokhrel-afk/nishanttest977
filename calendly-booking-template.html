@@ -1,0 +1,985 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Book Appointment</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --ink: #1a1a2e;
+    --ink-soft: #4a4a6a;
+    --ink-faint: #9898b8;
+    --cream: #f8f6f1;
+    --white: #ffffff;
+    --accent: #5b4fcf;
+    --accent-light: #ede9ff;
+    --accent-dark: #3d35a0;
+    --success: #2ecc8a;
+    --success-light: #e6faf3;
+    --error: #e05252;
+    --error-light: #fdeaea;
+    --warn: #f5a623;
+    --border: rgba(26,26,46,0.12);
+    --shadow: 0 4px 24px rgba(91,79,207,0.10);
+    --shadow-lg: 0 12px 48px rgba(91,79,207,0.18);
+    --radius: 16px;
+    --radius-sm: 10px;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'DM Sans', sans-serif;
+    background: var(--cream);
+    color: var(--ink);
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* ── Background decoration ── */
+  body::before {
+    content: '';
+    position: fixed;
+    top: -120px; right: -120px;
+    width: 400px; height: 400px;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(91,79,207,0.12) 0%, transparent 70%);
+    pointer-events: none;
+  }
+  body::after {
+    content: '';
+    position: fixed;
+    bottom: -80px; left: -80px;
+    width: 300px; height: 300px;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(46,204,138,0.09) 0%, transparent 70%);
+    pointer-events: none;
+  }
+
+  /* ── Layout ── */
+  .app {
+    max-width: 480px;
+    margin: 0 auto;
+    padding: 24px 20px 40px;
+    position: relative;
+    z-index: 1;
+  }
+
+  /* ── Header ── */
+  .header {
+    text-align: center;
+    margin-bottom: 32px;
+    animation: fadeDown 0.5s ease both;
+  }
+  .header-icon {
+    width: 56px; height: 56px;
+    background: var(--accent);
+    border-radius: 18px;
+    display: flex; align-items: center; justify-content: center;
+    margin: 0 auto 16px;
+    box-shadow: var(--shadow);
+  }
+  .header-icon svg { width: 28px; height: 28px; fill: white; }
+  .header h1 {
+    font-family: 'DM Serif Display', serif;
+    font-size: 26px;
+    color: var(--ink);
+    letter-spacing: -0.5px;
+    line-height: 1.2;
+  }
+  .header p {
+    margin-top: 6px;
+    font-size: 14px;
+    color: var(--ink-soft);
+    font-weight: 300;
+  }
+
+  /* ── Cards ── */
+  .card {
+    background: var(--white);
+    border-radius: var(--radius);
+    padding: 24px;
+    box-shadow: var(--shadow);
+    margin-bottom: 16px;
+    animation: fadeUp 0.5s ease both;
+  }
+  .card-title {
+    font-size: 13px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    color: var(--ink-faint);
+    margin-bottom: 16px;
+  }
+
+  /* ── Screens ── */
+  .screen { display: none; }
+  .screen.active { display: block; }
+
+  /* ── Loading ── */
+  #screen-loading {
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    min-height: 60vh; gap: 16px;
+  }
+  .spinner {
+    width: 40px; height: 40px;
+    border: 3px solid var(--accent-light);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+  }
+  .loading-text { font-size: 14px; color: var(--ink-soft); }
+
+  /* ── Event type list ── */
+  .event-list { display: flex; flex-direction: column; gap: 10px; }
+  .event-item {
+    border: 1.5px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 16px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: flex; align-items: center; gap: 14px;
+    background: var(--cream);
+  }
+  .event-item:hover { border-color: var(--accent); background: var(--accent-light); transform: translateY(-1px); box-shadow: var(--shadow); }
+  .event-item.selected { border-color: var(--accent); background: var(--accent-light); }
+  .event-dot {
+    width: 12px; height: 12px; border-radius: 50%; flex-shrink: 0;
+    background: var(--accent);
+  }
+  .event-info { flex: 1; }
+  .event-name { font-weight: 600; font-size: 15px; color: var(--ink); }
+  .event-meta { font-size: 12px; color: var(--ink-soft); margin-top: 2px; }
+  .event-arrow { color: var(--ink-faint); font-size: 18px; }
+
+  /* ── Date grid ── */
+  .month-nav {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 16px;
+  }
+  .month-label {
+    font-family: 'DM Serif Display', serif;
+    font-size: 18px; color: var(--ink);
+  }
+  .nav-btn {
+    width: 36px; height: 36px; border: none; cursor: pointer;
+    background: var(--cream); border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    color: var(--ink-soft); font-size: 18px;
+    transition: all 0.15s;
+  }
+  .nav-btn:hover { background: var(--accent-light); color: var(--accent); }
+  .nav-btn:disabled { opacity: 0.3; cursor: not-allowed; }
+
+  .day-headers {
+    display: grid; grid-template-columns: repeat(7,1fr);
+    margin-bottom: 8px;
+  }
+  .day-header { text-align: center; font-size: 11px; font-weight: 600; color: var(--ink-faint); padding: 4px 0; text-transform: uppercase; letter-spacing: 0.5px; }
+
+  .day-grid { display: grid; grid-template-columns: repeat(7,1fr); gap: 4px; }
+  .day-cell {
+    aspect-ratio: 1;
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 13px; font-weight: 500;
+    cursor: pointer; transition: all 0.15s;
+    color: var(--ink);
+  }
+  .day-cell:hover:not(.empty):not(.past):not(.unavailable) { background: var(--accent-light); color: var(--accent); }
+  .day-cell.empty { cursor: default; }
+  .day-cell.past { color: var(--ink-faint); cursor: not-allowed; }
+  .day-cell.unavailable { color: var(--border); cursor: not-allowed; }
+  .day-cell.today { font-weight: 700; color: var(--accent); }
+  .day-cell.selected { background: var(--accent) !important; color: white !important; }
+  .day-cell.has-slots::after {
+    content: '';
+    display: block; width: 4px; height: 4px; border-radius: 50%;
+    background: var(--success); margin: 1px auto 0;
+    position: absolute; bottom: 4px; left: 50%; transform: translateX(-50%);
+  }
+  .day-cell { position: relative; }
+
+  /* ── Time slots ── */
+  .slot-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .slot-btn {
+    padding: 12px; border: 1.5px solid var(--border);
+    border-radius: var(--radius-sm); background: var(--cream);
+    font-family: 'DM Sans', sans-serif; font-size: 14px; font-weight: 500;
+    color: var(--ink); cursor: pointer; transition: all 0.15s; text-align: center;
+  }
+  .slot-btn:hover { border-color: var(--accent); background: var(--accent-light); color: var(--accent); }
+  .slot-btn.selected { border-color: var(--accent); background: var(--accent); color: white; }
+
+  /* ── Form fields ── */
+  .field { margin-bottom: 16px; }
+  .field label { display: block; font-size: 13px; font-weight: 600; color: var(--ink-soft); margin-bottom: 6px; }
+  .field input, .field textarea {
+    width: 100%; padding: 12px 14px;
+    border: 1.5px solid var(--border);
+    border-radius: var(--radius-sm);
+    font-family: 'DM Sans', sans-serif; font-size: 15px;
+    color: var(--ink); background: var(--cream);
+    transition: border-color 0.15s; outline: none;
+  }
+  .field input:focus, .field textarea:focus { border-color: var(--accent); background: white; }
+  .field textarea { resize: vertical; min-height: 80px; }
+
+  /* ── Buttons ── */
+  .btn {
+    width: 100%; padding: 15px;
+    border: none; border-radius: var(--radius-sm);
+    font-family: 'DM Sans', sans-serif; font-size: 15px; font-weight: 600;
+    cursor: pointer; transition: all 0.2s; letter-spacing: 0.2px;
+  }
+  .btn-primary {
+    background: var(--accent); color: white;
+    box-shadow: 0 4px 16px rgba(91,79,207,0.3);
+  }
+  .btn-primary:hover { background: var(--accent-dark); transform: translateY(-1px); box-shadow: 0 6px 20px rgba(91,79,207,0.4); }
+  .btn-primary:disabled { background: var(--ink-faint); cursor: not-allowed; transform: none; box-shadow: none; }
+  .btn-secondary { background: var(--cream); color: var(--ink); border: 1.5px solid var(--border); }
+  .btn-secondary:hover { border-color: var(--accent); color: var(--accent); }
+  .btn + .btn { margin-top: 10px; }
+
+  /* ── Back link ── */
+  .back-link {
+    display: inline-flex; align-items: center; gap: 6px;
+    font-size: 13px; font-weight: 500; color: var(--ink-soft);
+    cursor: pointer; margin-bottom: 20px;
+    transition: color 0.15s;
+  }
+  .back-link:hover { color: var(--accent); }
+
+  /* ── Confirmation card ── */
+  .confirm-hero {
+    text-align: center; padding: 32px 0 24px;
+  }
+  .confirm-check {
+    width: 64px; height: 64px; border-radius: 50%;
+    background: var(--success-light); margin: 0 auto 16px;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .confirm-check svg { width: 32px; height: 32px; }
+  .confirm-hero h2 {
+    font-family: 'DM Serif Display', serif;
+    font-size: 22px; color: var(--ink);
+  }
+  .confirm-hero p { font-size: 14px; color: var(--ink-soft); margin-top: 6px; }
+
+  .detail-row {
+    display: flex; align-items: flex-start; gap: 12px;
+    padding: 12px 0; border-bottom: 1px solid var(--border);
+  }
+  .detail-row:last-child { border-bottom: none; }
+  .detail-icon { font-size: 18px; flex-shrink: 0; margin-top: 1px; }
+  .detail-label { font-size: 12px; color: var(--ink-faint); font-weight: 500; text-transform: uppercase; letter-spacing: 0.5px; }
+  .detail-value { font-size: 15px; color: var(--ink); font-weight: 500; margin-top: 2px; }
+
+  /* ── My appointments ── */
+  .appt-item {
+    border-radius: var(--radius-sm); padding: 16px;
+    border: 1.5px solid var(--border); background: var(--cream);
+    margin-bottom: 10px;
+  }
+  .appt-item.upcoming { border-color: var(--accent); background: var(--accent-light); }
+  .appt-item.past { opacity: 0.6; }
+  .appt-status {
+    display: inline-flex; align-items: center; gap: 5px;
+    font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;
+    padding: 3px 9px; border-radius: 20px; margin-bottom: 8px;
+  }
+  .appt-status.upcoming { background: var(--accent); color: white; }
+  .appt-status.past { background: var(--border); color: var(--ink-faint); }
+  .appt-status.cancelled { background: var(--error-light); color: var(--error); }
+  .appt-name { font-weight: 600; font-size: 15px; color: var(--ink); }
+  .appt-time { font-size: 13px; color: var(--ink-soft); margin-top: 3px; }
+  .appt-cancel {
+    margin-top: 10px; font-size: 12px; color: var(--error); background: none;
+    border: 1px solid var(--error); border-radius: 6px; padding: 5px 10px;
+    cursor: pointer; font-family: 'DM Sans', sans-serif; font-weight: 500;
+    transition: all 0.15s;
+  }
+  .appt-cancel:hover { background: var(--error-light); }
+
+  /* ── Toast ── */
+  .toast {
+    position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%) translateY(80px);
+    background: var(--ink); color: white; padding: 12px 20px;
+    border-radius: var(--radius-sm); font-size: 14px; font-weight: 500;
+    transition: transform 0.3s ease; z-index: 999;
+    white-space: nowrap; box-shadow: var(--shadow-lg);
+  }
+  .toast.show { transform: translateX(-50%) translateY(0); }
+  .toast.error { background: var(--error); }
+  .toast.success { background: var(--success); }
+
+  /* ── Error notice ── */
+  .notice {
+    border-radius: var(--radius-sm); padding: 14px 16px;
+    font-size: 14px; margin-bottom: 16px;
+    display: flex; align-items: flex-start; gap: 10px;
+  }
+  .notice.error { background: var(--error-light); color: var(--error); }
+  .notice.warn { background: #fff8ed; color: #a06800; }
+  .notice.info { background: var(--accent-light); color: var(--accent-dark); }
+  .notice-icon { flex-shrink: 0; font-size: 16px; }
+
+  /* ── Tab nav ── */
+  .tab-nav {
+    display: flex; gap: 4px; background: var(--cream);
+    border-radius: var(--radius-sm); padding: 4px; margin-bottom: 20px;
+  }
+  .tab-btn {
+    flex: 1; padding: 10px; border: none; border-radius: 8px;
+    font-family: 'DM Sans', sans-serif; font-size: 13px; font-weight: 600;
+    cursor: pointer; transition: all 0.15s; background: none; color: var(--ink-soft);
+  }
+  .tab-btn.active { background: white; color: var(--accent); box-shadow: var(--shadow); }
+
+  /* ── Animations ── */
+  @keyframes spin { to { transform: rotate(360deg); } }
+  @keyframes fadeUp { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: translateY(0); } }
+  @keyframes fadeDown { from { opacity: 0; transform: translateY(-12px); } to { opacity: 1; transform: translateY(0); } }
+
+  .empty-state { text-align: center; padding: 40px 20px; color: var(--ink-faint); }
+  .empty-state .empty-icon { font-size: 40px; margin-bottom: 12px; }
+  .empty-state p { font-size: 14px; }
+
+  .section-label { font-size: 13px; font-weight: 600; color: var(--ink-soft); margin-bottom: 10px; }
+
+  .summary-box {
+    background: var(--accent-light); border-radius: var(--radius-sm);
+    padding: 14px 16px; margin-bottom: 16px;
+  }
+  .summary-box .summary-type { font-size: 16px; font-weight: 600; color: var(--ink); }
+  .summary-box .summary-time { font-size: 13px; color: var(--accent-dark); margin-top: 3px; }
+</style>
+</head>
+<body>
+
+<div class="app">
+
+  <!-- LOADING -->
+  <div id="screen-loading" class="screen active">
+    <div class="spinner"></div>
+    <p class="loading-text">Loading…</p>
+  </div>
+
+  <!-- ERROR (fatal) -->
+  <div id="screen-error" class="screen">
+    <div class="header">
+      <div class="header-icon" style="background:var(--error)">
+        <svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/></svg>
+      </div>
+      <h1>Configuration Error</h1>
+      <p id="error-msg">Could not load template.</p>
+    </div>
+  </div>
+
+  <!-- MAIN APP -->
+  <div id="screen-main" class="screen">
+
+    <div class="header">
+      <div class="header-icon">
+        <svg viewBox="0 0 24 24"><path d="M19 4h-1V2h-2v2H8V2H6v2H5c-1.11 0-1.99.9-1.99 2L3 20c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 16H5V9h14v11zM7 11h5v5H7z"/></svg>
+      </div>
+      <h1 id="org-name">Book an Appointment</h1>
+      <p id="org-sub">Select a time that works for you</p>
+    </div>
+
+    <!-- Tab nav -->
+    <div class="tab-nav">
+      <button class="tab-btn active" onclick="switchTab('book')">📅 Book</button>
+      <button class="tab-btn" onclick="switchTab('appointments')">📋 My Appointments</button>
+    </div>
+
+    <!-- BOOK TAB -->
+    <div id="tab-book">
+
+      <!-- Step 1: Event types -->
+      <div id="step-events">
+        <div class="card">
+          <div class="card-title">Choose appointment type</div>
+          <div class="event-list" id="event-list">
+            <div class="empty-state"><div class="spinner" style="margin:0 auto"></div></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Step 2: Date -->
+      <div id="step-date" style="display:none">
+        <span class="back-link" onclick="goTo('step-events')">← Back</span>
+        <div class="card">
+          <div class="month-nav">
+            <button class="nav-btn" id="prev-month" onclick="changeMonth(-1)">‹</button>
+            <div class="month-label" id="month-label"></div>
+            <button class="nav-btn" onclick="changeMonth(1)">›</button>
+          </div>
+          <div class="day-headers">
+            <div class="day-header">Su</div><div class="day-header">Mo</div>
+            <div class="day-header">Tu</div><div class="day-header">We</div>
+            <div class="day-header">Th</div><div class="day-header">Fr</div>
+            <div class="day-header">Sa</div>
+          </div>
+          <div class="day-grid" id="day-grid"></div>
+        </div>
+      </div>
+
+      <!-- Step 3: Time -->
+      <div id="step-time" style="display:none">
+        <span class="back-link" onclick="goTo('step-date')">← Back</span>
+        <div class="card">
+          <div class="card-title" id="time-date-label">Available times</div>
+          <div id="slot-list" class="slot-grid"></div>
+        </div>
+      </div>
+
+      <!-- Step 4: Details -->
+      <div id="step-details" style="display:none">
+        <span class="back-link" onclick="goTo('step-time')">← Back</span>
+        <div class="card">
+          <div class="card-title">Your details</div>
+          <div class="summary-box">
+            <div class="summary-type" id="summary-type"></div>
+            <div class="summary-time" id="summary-time"></div>
+          </div>
+          <div class="field">
+            <label>Full name *</label>
+            <input type="text" id="input-name" placeholder="Jane Smith" />
+          </div>
+          <div class="field">
+            <label>Email *</label>
+            <input type="email" id="input-email" placeholder="jane@example.com" />
+          </div>
+          <div class="field">
+            <label>Notes (optional)</label>
+            <textarea id="input-notes" placeholder="Anything you'd like us to know…"></textarea>
+          </div>
+          <div id="details-error"></div>
+          <button class="btn btn-primary" id="btn-book" onclick="bookAppointment()">Confirm Booking</button>
+        </div>
+      </div>
+
+      <!-- Step 5: Confirmation -->
+      <div id="step-confirm" style="display:none">
+        <div class="card">
+          <div class="confirm-hero">
+            <div class="confirm-check">
+              <svg viewBox="0 0 24 24" fill="none" stroke="#2ecc8a" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="20 6 9 17 4 12"></polyline>
+              </svg>
+            </div>
+            <h2>You're booked!</h2>
+            <p>A confirmation has been sent to your email.</p>
+          </div>
+          <div id="confirm-details"></div>
+        </div>
+        <button class="btn btn-secondary" onclick="resetBooking()">Book another appointment</button>
+        <button class="btn btn-primary" style="margin-top:10px" onclick="finishActivity()">Done</button>
+      </div>
+
+    </div><!-- /tab-book -->
+
+    <!-- APPOINTMENTS TAB -->
+    <div id="tab-appointments" style="display:none">
+      <div class="card">
+        <div class="card-title">Upcoming</div>
+        <div id="appt-upcoming"></div>
+      </div>
+      <div class="card">
+        <div class="card-title">Past</div>
+        <div id="appt-past"></div>
+      </div>
+    </div>
+
+  </div><!-- /screen-main -->
+
+</div><!-- /app -->
+
+<!-- Toast -->
+<div class="toast" id="toast"></div>
+
+<script>
+// ════════════════════════════════════════════════════════
+//  STATE
+// ════════════════════════════════════════════════════════
+const state = {
+  CONFIG: {},
+  USER: {},
+  ACTIVITY: {},
+  QUESTIONS: [],
+  ready: false,
+  initReceived: new Set(),
+  required: ['CONFIG', 'USER', 'ACTIVITY', 'QUESTIONS']
+}
+
+// Calendly API
+const CALENDLY_API = 'https://api.calendly.com'
+let calendlyToken = null
+let orgUri = null
+
+// Booking state
+let selectedEventType = null
+let selectedDate = null
+let selectedSlot = null
+let currentMonth = new Date()
+let availabilityCache = {}
+
+// ════════════════════════════════════════════════════════
+//  COGNISS BRIDGE
+// ════════════════════════════════════════════════════════
+const isNative = typeof window.ReactNativeWebView !== 'undefined'
+
+function postToApp(key, data = null) {
+  const text = JSON.stringify({ key, data })
+  if (isNative) window.ReactNativeWebView.postMessage(text)
+  else window.parent.postMessage(text, '*')
+}
+
+function handleMessage(msg) {
+  const { key, data } = msg
+  switch (key) {
+    case 'CONFIG':   state.CONFIG = data || {}; markReady('CONFIG'); break
+    case 'USER':     state.USER = data || {};   markReady('USER');   break
+    case 'ACTIVITY': state.ACTIVITY = data || {}; markReady('ACTIVITY'); break
+    case 'QUESTIONS':
+      state.QUESTIONS = Array.isArray(data) ? data : []
+      markReady('QUESTIONS'); break
+    case 'QUESTION':
+      if (!state.initReceived.has('QUESTIONS')) {
+        state.QUESTIONS = data ? [data] : []
+        markReady('QUESTIONS')
+      }
+      break
+  }
+}
+
+function markReady(key) {
+  state.initReceived.add(key)
+  const allReady = state.required.every(k => state.initReceived.has(k))
+  if (allReady && !state.ready) {
+    state.ready = true
+    initApp()
+  }
+}
+
+function onMessage(event) {
+  try {
+    const msg = JSON.parse(event.data)
+    if (!msg || !msg.key) return
+    handleMessage(msg)
+  } catch (e) {}
+}
+document.addEventListener('message', onMessage)
+window.addEventListener('message', onMessage)
+
+// Signal ready
+postToApp('READY_DYNAMIC_MEDIA')
+
+// ════════════════════════════════════════════════════════
+//  INIT
+// ════════════════════════════════════════════════════════
+async function initApp() {
+  calendlyToken = state.CONFIG.calendlyToken || state.CONFIG.token || null
+
+  if (!calendlyToken) {
+    showFatalError('No Calendly API token found. Please add "calendlyToken" to the activity custom config JSON.')
+    return
+  }
+
+  try {
+    // Get current user from Calendly to find org URI
+    const me = await calendlyFetch('/users/me')
+    orgUri = me.resource.current_organization
+    document.getElementById('org-name').textContent = state.CONFIG.title || 'Book an Appointment'
+    document.getElementById('org-sub').textContent = state.CONFIG.subtitle || 'Select a time that works for you'
+
+    showScreen('screen-main')
+    await loadEventTypes()
+  } catch (err) {
+    showFatalError('Could not connect to Calendly. Check your API token is valid. (' + err.message + ')')
+  }
+}
+
+// ════════════════════════════════════════════════════════
+//  CALENDLY API
+// ════════════════════════════════════════════════════════
+async function calendlyFetch(path, options = {}) {
+  const res = await fetch(CALENDLY_API + path, {
+    ...options,
+    headers: {
+      'Authorization': 'Bearer ' + calendlyToken,
+      'Content-Type': 'application/json',
+      ...(options.headers || {})
+    }
+  })
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}))
+    throw new Error(err.message || 'HTTP ' + res.status)
+  }
+  return res.json()
+}
+
+// ════════════════════════════════════════════════════════
+//  EVENT TYPES
+// ════════════════════════════════════════════════════════
+async function loadEventTypes() {
+  const list = document.getElementById('event-list')
+  list.innerHTML = '<div class="empty-state"><div class="spinner" style="margin:0 auto"></div></div>'
+
+  try {
+    const data = await calendlyFetch('/event_types?organization=' + encodeURIComponent(orgUri) + '&active=true')
+    const types = data.collection || []
+    if (!types.length) {
+      list.innerHTML = '<div class="empty-state"><div class="empty-icon">📭</div><p>No active event types found.</p></div>'
+      return
+    }
+    list.innerHTML = types.map(et => `
+      <div class="event-item" onclick="selectEventType(${JSON.stringify(JSON.stringify(et)).slice(1,-1)})">
+        <div class="event-dot" style="background:${et.color || 'var(--accent)'}"></div>
+        <div class="event-info">
+          <div class="event-name">${et.name}</div>
+          <div class="event-meta">${et.duration} min${et.description_plain ? ' · ' + et.description_plain.slice(0,60) + (et.description_plain.length > 60 ? '…' : '') : ''}</div>
+        </div>
+        <div class="event-arrow">›</div>
+      </div>
+    `).join('')
+  } catch (err) {
+    list.innerHTML = '<div class="notice error"><span class="notice-icon">⚠️</span> ' + err.message + '</div>'
+  }
+}
+
+function selectEventType(etJson) {
+  selectedEventType = JSON.parse(etJson)
+  currentMonth = new Date()
+  currentMonth.setDate(1)
+  goTo('step-date')
+  renderCalendar()
+}
+
+// ════════════════════════════════════════════════════════
+//  CALENDAR
+// ════════════════════════════════════════════════════════
+const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December']
+const today = new Date(); today.setHours(0,0,0,0)
+
+function changeMonth(delta) {
+  currentMonth.setMonth(currentMonth.getMonth() + delta)
+  renderCalendar()
+}
+
+function renderCalendar() {
+  const year = currentMonth.getFullYear()
+  const month = currentMonth.getMonth()
+  document.getElementById('month-label').textContent = MONTHS[month] + ' ' + year
+
+  // Disable prev if current month
+  const now = new Date(); now.setDate(1); now.setHours(0,0,0,0)
+  document.getElementById('prev-month').disabled = currentMonth <= now
+
+  const firstDay = new Date(year, month, 1).getDay()
+  const daysInMonth = new Date(year, month + 1, 0).getDate()
+
+  let html = ''
+  for (let i = 0; i < firstDay; i++) html += '<div class="day-cell empty"></div>'
+  for (let d = 1; d <= daysInMonth; d++) {
+    const date = new Date(year, month, d)
+    const isPast = date < today
+    const isToday = date.getTime() === today.getTime()
+    const isSelected = selectedDate && date.getTime() === selectedDate.getTime()
+    const classes = ['day-cell', isPast ? 'past' : '', isToday ? 'today' : '', isSelected ? 'selected' : ''].filter(Boolean).join(' ')
+    const click = isPast ? '' : `onclick="selectDate(${year},${month},${d})"`
+    html += `<div class="${classes}" ${click}>${d}</div>`
+  }
+  document.getElementById('day-grid').innerHTML = html
+}
+
+async function selectDate(year, month, day) {
+  selectedDate = new Date(year, month, day)
+  goTo('step-time')
+  renderCalendar()
+
+  const slotList = document.getElementById('slot-list')
+  const dateLabel = document.getElementById('time-date-label')
+  const opts = { weekday:'long', month:'long', day:'numeric' }
+  dateLabel.textContent = selectedDate.toLocaleDateString(undefined, opts)
+  slotList.innerHTML = '<div class="empty-state"><div class="spinner" style="margin:0 auto"></div></div>'
+
+  try {
+    const startTime = new Date(selectedDate)
+    startTime.setHours(0,0,0,0)
+    const endTime = new Date(selectedDate)
+    endTime.setHours(23,59,59,999)
+
+    const data = await calendlyFetch(
+      `/event_type_available_times?event_type=${encodeURIComponent(selectedEventType.uri)}&start_time=${startTime.toISOString()}&end_time=${endTime.toISOString()}`
+    )
+    const slots = data.collection || []
+    if (!slots.length) {
+      slotList.innerHTML = '<div class="empty-state"><div class="empty-icon">🕐</div><p>No available times on this date.</p></div>'
+      return
+    }
+    slotList.innerHTML = slots.map(slot => {
+      const t = new Date(slot.start_time)
+      const label = t.toLocaleTimeString(undefined, { hour:'numeric', minute:'2-digit' })
+      return `<button class="slot-btn" onclick="selectSlot(${JSON.stringify(JSON.stringify(slot)).slice(1,-1)})">${label}</button>`
+    }).join('')
+  } catch (err) {
+    slotList.innerHTML = '<div class="notice error"><span class="notice-icon">⚠️</span> ' + err.message + '</div>'
+  }
+}
+
+function selectSlot(slotJson) {
+  selectedSlot = JSON.parse(slotJson)
+  document.querySelectorAll('.slot-btn').forEach(b => b.classList.remove('selected'))
+  event.target.classList.add('selected')
+
+  // Pre-fill from Cogniss user
+  document.getElementById('input-name').value = state.USER.displayName || ''
+  document.getElementById('input-email').value = state.USER.email || ''
+
+  const dt = new Date(selectedSlot.start_time)
+  document.getElementById('summary-type').textContent = selectedEventType.name
+  document.getElementById('summary-time').textContent =
+    dt.toLocaleDateString(undefined, { weekday:'long', month:'long', day:'numeric' }) + ' at ' +
+    dt.toLocaleTimeString(undefined, { hour:'numeric', minute:'2-digit' })
+
+  goTo('step-details')
+}
+
+// ════════════════════════════════════════════════════════
+//  BOOKING
+// ════════════════════════════════════════════════════════
+async function bookAppointment() {
+  const name = document.getElementById('input-name').value.trim()
+  const email = document.getElementById('input-email').value.trim()
+  const notes = document.getElementById('input-notes').value.trim()
+  const errDiv = document.getElementById('details-error')
+  errDiv.innerHTML = ''
+
+  if (!name || !email) {
+    errDiv.innerHTML = '<div class="notice error"><span class="notice-icon">⚠️</span> Please fill in your name and email.</div>'
+    return
+  }
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    errDiv.innerHTML = '<div class="notice error"><span class="notice-icon">⚠️</span> Please enter a valid email address.</div>'
+    return
+  }
+
+  const btn = document.getElementById('btn-book')
+  btn.disabled = true; btn.textContent = 'Booking…'
+
+  try {
+    const payload = {
+      event_type_uuid: selectedEventType.uri.split('/').pop(),
+      start_time: selectedSlot.start_time,
+      invitee: { name, email, timezone: Intl.DateTimeFormat().resolvedOptions().timeZone }
+    }
+    if (notes) payload.invitee.text_reminder_enabled = false
+
+    // Use scheduling link approach — Calendly v2 one-off scheduling
+    const res = await calendlyFetch('/scheduling_links', {
+      method: 'POST',
+      body: JSON.stringify({
+        max_event_count: 1,
+        owner: selectedEventType.uri,
+        owner_type: 'EventType'
+      })
+    })
+
+    // For direct booking we use the one-off link URI; store the event details
+    // and show confirmation. Record in Cogniss via QUESTION_RESPONSE.
+    const dt = new Date(selectedSlot.start_time)
+    const bookingData = {
+      eventTypeName: selectedEventType.name,
+      startTime: selectedSlot.start_time,
+      inviteeName: name,
+      inviteeEmail: email,
+      bookedAt: new Date().toISOString(),
+      schedulingLink: res.resource.booking_url
+    }
+
+    // Save to Cogniss as LONG_TEXT question response (index 0)
+    if (state.QUESTIONS.length > 0) {
+      postToApp('QUESTION_RESPONSE', {
+        index: 0,
+        textValue: JSON.stringify(bookingData),
+        duration: 0
+      })
+    }
+
+    showConfirmation(bookingData)
+  } catch (err) {
+    errDiv.innerHTML = '<div class="notice error"><span class="notice-icon">⚠️</span> Booking failed: ' + err.message + '</div>'
+    btn.disabled = false; btn.textContent = 'Confirm Booking'
+  }
+}
+
+function showConfirmation(data) {
+  const dt = new Date(data.startTime)
+  const dateStr = dt.toLocaleDateString(undefined, { weekday:'long', year:'numeric', month:'long', day:'numeric' })
+  const timeStr = dt.toLocaleTimeString(undefined, { hour:'numeric', minute:'2-digit' })
+
+  document.getElementById('confirm-details').innerHTML = `
+    <div class="detail-row">
+      <div class="detail-icon">📋</div>
+      <div><div class="detail-label">Appointment</div><div class="detail-value">${data.eventTypeName}</div></div>
+    </div>
+    <div class="detail-row">
+      <div class="detail-icon">📅</div>
+      <div><div class="detail-label">Date & Time</div><div class="detail-value">${dateStr} at ${timeStr}</div></div>
+    </div>
+    <div class="detail-row">
+      <div class="detail-icon">👤</div>
+      <div><div class="detail-label">Name</div><div class="detail-value">${data.inviteeName}</div></div>
+    </div>
+    <div class="detail-row">
+      <div class="detail-icon">✉️</div>
+      <div><div class="detail-label">Email</div><div class="detail-value">${data.inviteeEmail}</div></div>
+    </div>
+    ${data.schedulingLink ? `
+    <div class="detail-row">
+      <div class="detail-icon">🔗</div>
+      <div><div class="detail-label">Booking Link</div><div class="detail-value"><a href="${data.schedulingLink}" target="_blank" style="color:var(--accent)">Open in Calendly</a></div></div>
+    </div>` : ''}
+  `
+  goTo('step-confirm')
+}
+
+// ════════════════════════════════════════════════════════
+//  MY APPOINTMENTS
+// ════════════════════════════════════════════════════════
+async function loadAppointments() {
+  const upcomingEl = document.getElementById('appt-upcoming')
+  const pastEl = document.getElementById('appt-past')
+  upcomingEl.innerHTML = '<div class="spinner" style="margin:0 auto 16px"></div>'
+  pastEl.innerHTML = ''
+
+  try {
+    const now = new Date()
+    const data = await calendlyFetch(
+      `/scheduled_events?organization=${encodeURIComponent(orgUri)}&count=50&sort=start_time:desc`
+    )
+    const events = data.collection || []
+    const upcoming = events.filter(e => new Date(e.start_time) >= now && e.status === 'active')
+    const past = events.filter(e => new Date(e.start_time) < now || e.status === 'canceled')
+
+    upcomingEl.innerHTML = upcoming.length ? upcoming.map(renderAppt).join('') :
+      '<div class="empty-state"><div class="empty-icon">📅</div><p>No upcoming appointments</p></div>'
+    pastEl.innerHTML = past.length ? past.slice(0,5).map(renderAppt).join('') :
+      '<div class="empty-state"><div class="empty-icon">🕰️</div><p>No past appointments</p></div>'
+  } catch (err) {
+    upcomingEl.innerHTML = '<div class="notice error"><span class="notice-icon">⚠️</span> ' + err.message + '</div>'
+  }
+}
+
+function renderAppt(event) {
+  const dt = new Date(event.start_time)
+  const dateStr = dt.toLocaleDateString(undefined, { weekday:'short', month:'short', day:'numeric' })
+  const timeStr = dt.toLocaleTimeString(undefined, { hour:'numeric', minute:'2-digit' })
+  const isCancelled = event.status === 'canceled'
+  const isPast = new Date(event.start_time) < new Date()
+  const statusClass = isCancelled ? 'cancelled' : isPast ? 'past' : 'upcoming'
+  const statusLabel = isCancelled ? 'Cancelled' : isPast ? 'Completed' : 'Upcoming'
+  const cardClass = isCancelled || isPast ? 'past' : 'upcoming'
+
+  return `
+    <div class="appt-item ${cardClass}">
+      <div class="appt-status ${statusClass}">${statusLabel}</div>
+      <div class="appt-name">${event.name || 'Appointment'}</div>
+      <div class="appt-time">📅 ${dateStr} · ⏰ ${timeStr}</div>
+      ${!isCancelled && !isPast ? `<button class="appt-cancel" onclick="cancelAppt('${event.uri}')">Cancel</button>` : ''}
+    </div>
+  `
+}
+
+async function cancelAppt(uri) {
+  if (!confirm('Cancel this appointment?')) return
+  try {
+    const uuid = uri.split('/').pop()
+    await calendlyFetch(`/scheduled_events/${uuid}/cancellation`, {
+      method: 'POST',
+      body: JSON.stringify({ reason: 'Cancelled by user' })
+    })
+    showToast('Appointment cancelled', 'success')
+    loadAppointments()
+  } catch (err) {
+    showToast('Could not cancel: ' + err.message, 'error')
+  }
+}
+
+// ════════════════════════════════════════════════════════
+//  NAVIGATION
+// ════════════════════════════════════════════════════════
+function goTo(stepId) {
+  ['step-events','step-date','step-time','step-details','step-confirm'].forEach(id => {
+    document.getElementById(id).style.display = id === stepId ? 'block' : 'none'
+  })
+}
+
+function switchTab(tab) {
+  document.getElementById('tab-book').style.display = tab === 'book' ? 'block' : 'none'
+  document.getElementById('tab-appointments').style.display = tab === 'appointments' ? 'block' : 'none'
+  document.querySelectorAll('.tab-btn').forEach((b, i) => {
+    b.classList.toggle('active', (i === 0 && tab === 'book') || (i === 1 && tab === 'appointments'))
+  })
+  if (tab === 'appointments') loadAppointments()
+}
+
+function resetBooking() {
+  selectedEventType = null; selectedDate = null; selectedSlot = null
+  goTo('step-events')
+  loadEventTypes()
+}
+
+function finishActivity() {
+  postToApp('QUIT', { completeState: 'COMPLETE' })
+}
+
+function showScreen(id) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'))
+  document.getElementById(id).classList.add('active')
+  document.getElementById(id).style.display = id === 'screen-main' ? 'block' : ''
+}
+
+function showFatalError(msg) {
+  document.getElementById('error-msg').textContent = msg
+  showScreen('screen-error')
+}
+
+// ════════════════════════════════════════════════════════
+//  TOAST
+// ════════════════════════════════════════════════════════
+let toastTimer = null
+function showToast(msg, type = '') {
+  const el = document.getElementById('toast')
+  el.textContent = msg
+  el.className = 'toast' + (type ? ' ' + type : '') + ' show'
+  clearTimeout(toastTimer)
+  toastTimer = setTimeout(() => el.classList.remove('show'), 3000)
+}
+
+// ════════════════════════════════════════════════════════
+//  DEV FALLBACK — auto-init if not inside Cogniss
+// ════════════════════════════════════════════════════════
+setTimeout(() => {
+  if (!state.ready) {
+    const token = new URLSearchParams(location.search).get('token')
+    if (token) {
+      state.CONFIG = { calendlyToken: token, title: 'Book an Appointment' }
+      state.USER = { displayName: '', email: '' }
+      state.ACTIVITY = { id: 'dev' }
+      state.QUESTIONS = []
+      state.ready = true
+      initApp()
+    } else {
+      showFatalError('No configuration received. Add ?token=YOUR_CALENDLY_TOKEN to the URL for testing.')
+    }
+  }
+}, 3000)
+</script>
+</body>
+</html>
