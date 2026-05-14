@@ -1,0 +1,918 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Book Appointment</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet" />
+<link href="https://assets.calendly.com/assets/external/widget.css" rel="stylesheet" />
+<script src="https://assets.calendly.com/assets/external/widget.js" type="text/javascript" async></script>
+<style>
+  :root {
+    --ink: #1a1a2e;
+    --ink-soft: #4a4a6a;
+    --ink-faint: #9898b8;
+    --cream: #f8f6f1;
+    --white: #ffffff;
+    --accent: #5b4fcf;
+    --accent-light: #ede9ff;
+    --accent-dark: #3d35a0;
+    --success: #2ecc8a;
+    --success-light: #e6faf3;
+    --error: #e05252;
+    --error-light: #fdeaea;
+    --border: rgba(26,26,46,0.12);
+    --shadow: 0 4px 24px rgba(91,79,207,0.10);
+    --radius: 16px;
+    --radius-sm: 10px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'DM Sans', sans-serif; background: var(--cream); color: var(--ink); min-height: 100vh; }
+  body::before {
+    content: ''; position: fixed; top: -120px; right: -120px;
+    width: 400px; height: 400px; border-radius: 50%;
+    background: radial-gradient(circle, rgba(91,79,207,0.12) 0%, transparent 70%);
+    pointer-events: none;
+  }
+  .app { max-width: 480px; margin: 0 auto; padding: 48px 20px 60px; position: relative; z-index: 1; }
+
+  /* Close button */
+  .close-btn {
+    position: fixed; top: 16px; right: 16px; z-index: 100;
+    width: 40px; height: 40px; border-radius: 50%;
+    background: var(--white); border: 1.5px solid var(--border);
+    box-shadow: var(--shadow); cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    transition: all 0.2s; color: var(--ink-soft);
+    font-size: 20px; line-height: 1;
+  }
+  .close-btn:hover { background: var(--error-light); color: var(--error); border-color: var(--error); transform: scale(1.08); }
+
+  /* Header */
+  .header { text-align: center; margin-bottom: 28px; animation: fadeDown 0.5s ease both; }
+  .header-icon { width: 56px; height: 56px; background: var(--accent); border-radius: 18px; display: flex; align-items: center; justify-content: center; margin: 0 auto 16px; box-shadow: var(--shadow); }
+  .header-icon svg { width: 28px; height: 28px; fill: white; }
+  .header h1 { font-family: 'DM Serif Display', serif; font-size: 26px; color: var(--ink); letter-spacing: -0.5px; }
+  .header p { margin-top: 6px; font-size: 14px; color: var(--ink-soft); font-weight: 300; }
+
+  /* Tabs */
+  .tab-nav { display: flex; gap: 4px; background: var(--white); border-radius: var(--radius-sm); padding: 4px; margin-bottom: 20px; box-shadow: var(--shadow); }
+  .tab-btn { flex: 1; padding: 10px; border: none; border-radius: 8px; font-family: 'DM Sans', sans-serif; font-size: 13px; font-weight: 600; cursor: pointer; transition: all 0.15s; background: none; color: var(--ink-soft); }
+  .tab-btn.active { background: var(--accent); color: white; }
+
+  /* Cards */
+  .card { background: var(--white); border-radius: var(--radius); padding: 24px; box-shadow: var(--shadow); margin-bottom: 16px; animation: fadeUp 0.4s ease both; }
+  .card-title { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.8px; color: var(--ink-faint); margin-bottom: 16px; }
+
+  /* Event list */
+  .event-list { display: flex; flex-direction: column; gap: 10px; }
+  .event-item { border: 1.5px solid var(--border); border-radius: var(--radius-sm); padding: 16px; cursor: pointer; transition: all 0.2s; display: flex; align-items: center; gap: 14px; background: var(--cream); }
+  .event-item:hover { border-color: var(--accent); background: var(--accent-light); transform: translateY(-1px); box-shadow: var(--shadow); }
+  .event-dot { width: 12px; height: 12px; border-radius: 50%; flex-shrink: 0; background: var(--accent); }
+  .event-info { flex: 1; }
+  .event-name { font-weight: 600; font-size: 15px; color: var(--ink); }
+  .event-meta { font-size: 12px; color: var(--ink-soft); margin-top: 2px; }
+  .event-arrow { color: var(--ink-faint); font-size: 20px; }
+
+  /* Calendly widget */
+  #calendly-container { display: none; animation: fadeUp 0.4s ease both; }
+  .back-link { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 500; color: var(--ink-soft); cursor: pointer; margin-bottom: 16px; transition: color 0.15s; background: none; border: none; font-family: 'DM Sans', sans-serif; padding: 0; }
+  .back-link:hover { color: var(--accent); }
+
+  /* Widget — full width, responsive height */
+  #calendly-container { margin: 0 -20px; }
+  #widget-wrap { position: relative; width: 100%; }
+  #widget-overlay {
+    position: absolute; inset: 0; z-index: 10;
+    background: var(--cream);
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 14px; min-height: 300px;
+  }
+  #widget-overlay p { font-size: 14px; color: var(--ink-soft); }
+  #widget-overlay.hidden { display: none; }
+  #calendly-widget {
+    opacity: 0; transition: opacity 0.35s ease;
+    width: 100%; min-width: 0;
+    height: calc(100vh - 160px);
+    min-height: 520px;
+  }
+  #calendly-widget.ready { opacity: 1; }
+  .calendly-inline-widget {
+    width: 100% !important;
+    height: 100% !important;
+    border-radius: 0 !important;
+    overflow: hidden;
+    box-shadow: none !important;
+  }
+  .back-link { padding-left: 20px; }
+
+  /* Confirmation */
+  #booking-confirmed { display: none; animation: fadeUp 0.4s ease both; }
+  .confirm-hero { text-align: center; padding: 20px 0 24px; }
+  .confirm-check { width: 72px; height: 72px; border-radius: 50%; background: var(--success-light); margin: 0 auto 16px; display: flex; align-items: center; justify-content: center; animation: pop 0.4s ease both; }
+  .confirm-check svg { width: 36px; height: 36px; }
+  .confirm-hero h2 { font-family: 'DM Serif Display', serif; font-size: 24px; color: var(--ink); }
+  .confirm-hero p { font-size: 14px; color: var(--ink-soft); margin-top: 6px; }
+  .detail-row { display: flex; align-items: flex-start; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--border); }
+  .detail-row:last-child { border-bottom: none; }
+  .detail-icon { font-size: 18px; flex-shrink: 0; margin-top: 1px; }
+  .detail-label { font-size: 11px; color: var(--ink-faint); font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; }
+  .detail-value { font-size: 15px; color: var(--ink); font-weight: 500; margin-top: 2px; }
+
+  /* Appointments */
+  #tab-appointments { display: none; }
+  .appt-item { border-radius: var(--radius-sm); padding: 16px; border: 1.5px solid var(--border); background: var(--cream); margin-bottom: 10px; transition: all 0.2s; }
+  .appt-item.upcoming { border-color: var(--accent); background: var(--accent-light); }
+  .appt-badge { display: inline-block; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.6px; padding: 3px 8px; border-radius: 20px; margin-bottom: 8px; }
+  .appt-badge.upcoming { background: var(--accent); color: white; }
+  .appt-badge.past { background: var(--border); color: var(--ink-soft); }
+  .appt-badge.cancelled { background: var(--error-light); color: var(--error); }
+  .appt-name { font-weight: 600; font-size: 15px; color: var(--ink); }
+  .appt-time { font-size: 13px; color: var(--ink-soft); margin-top: 4px; }
+  .appt-summary { font-size: 12px; color: var(--ink-faint); margin-top: 6px; font-style: italic; border-top: 1px solid var(--border); padding-top: 8px; margin-top: 10px; }
+
+  /* Buttons */
+  .btn { width: 100%; padding: 15px; border: none; border-radius: var(--radius-sm); font-family: 'DM Sans', sans-serif; font-size: 15px; font-weight: 600; cursor: pointer; transition: all 0.2s; }
+  .btn-primary { background: var(--accent); color: white; box-shadow: 0 4px 16px rgba(91,79,207,0.3); margin-top: 12px; }
+  .btn-primary:hover { background: var(--accent-dark); transform: translateY(-1px); }
+  .btn-secondary { background: var(--cream); color: var(--ink); border: 1.5px solid var(--border); margin-top: 10px; }
+  .btn-secondary:hover { border-color: var(--accent); color: var(--accent); }
+
+  /* Screens */
+  .screen { display: none !important; }
+  .screen.active { display: block !important; }
+  #screen-loading.active { display: flex !important; flex-direction: column; align-items: center; justify-content: center; min-height: 60vh; gap: 16px; }
+  .spinner { width: 40px; height: 40px; border: 3px solid var(--accent-light); border-top-color: var(--accent); border-radius: 50%; animation: spin 0.8s linear infinite; }
+  .spinner.sm { width: 24px; height: 24px; border-width: 2px; }
+  .loading-text { font-size: 14px; color: var(--ink-soft); }
+  .notice { border-radius: var(--radius-sm); padding: 14px 16px; font-size: 14px; margin-bottom: 16px; }
+  .notice-banner {
+    background: var(--accent-light); border-radius: var(--radius-sm);
+    padding: 12px 14px; margin-bottom: 16px;
+    font-size: 13px; color: var(--accent-dark);
+    display: flex; align-items: flex-start; gap: 8px; line-height: 1.5;
+  }
+  .notice-banner-icon { flex-shrink: 0; font-size: 15px; }
+  .notice.error { background: var(--error-light); color: var(--error); }
+  .empty-state { text-align: center; padding: 32px 20px; color: var(--ink-faint); }
+  .empty-state .empty-icon { font-size: 36px; margin-bottom: 10px; }
+  .empty-state p { font-size: 14px; }
+
+  @keyframes spin { to { transform: rotate(360deg); } }
+  @keyframes fadeUp { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: translateY(0); } }
+  @keyframes fadeDown { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
+  @keyframes pop { 0% { transform: scale(0.5); opacity: 0; } 80% { transform: scale(1.1); } 100% { transform: scale(1); opacity: 1; } }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <!-- Close / exit button -->
+  <button class="close-btn" onclick="finishActivity()" title="Close">✕</button>
+
+  <!-- LOADING -->
+  <div id="screen-loading" class="screen active">
+    <div class="spinner"></div>
+    <p class="loading-text">Loading…</p>
+  </div>
+
+  <!-- FATAL ERROR -->
+  <div id="screen-error" class="screen">
+    <div class="header">
+      <div class="header-icon" style="background:var(--error)">
+        <svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/></svg>
+      </div>
+      <h1>Setup Error</h1>
+      <p id="error-msg">Could not load template.</p>
+    </div>
+  </div>
+
+  <!-- MAIN -->
+  <div id="screen-main" class="screen">
+    <div class="header">
+      <div class="header-icon">
+        <svg viewBox="0 0 24 24"><path d="M19 4h-1V2h-2v2H8V2H6v2H5c-1.11 0-1.99.9-1.99 2L3 20c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 16H5V9h14v11zM7 11h5v5H7z"/></svg>
+      </div>
+      <h1 id="app-title">Book an Appointment</h1>
+      <p id="app-subtitle">Select a time that works for you</p>
+    </div>
+
+    <div class="tab-nav">
+      <button class="tab-btn active" id="tab-btn-book" onclick="switchTab('book')">📅 Book</button>
+      <button class="tab-btn" id="tab-btn-appointments" onclick="switchTab('appointments')">📋 My Appointments</button>
+    </div>
+
+    <!-- BOOK TAB -->
+    <div id="tab-book">
+
+      <!-- Step 1: pick event type -->
+      <div id="event-picker">
+        <div class="card">
+          <div class="card-title">Choose appointment type</div>
+          <div class="event-list" id="event-list">
+            <div class="empty-state"><div class="spinner" style="margin:0 auto"></div></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Step 2: Calendly inline widget -->
+      <div id="calendly-container">
+        <button class="back-link" onclick="backToEvents()">← Back to appointment types</button>
+        <div id="widget-wrap">
+          <div id="widget-overlay">
+            <div class="spinner"></div>
+            <p>Loading calendar…</p>
+          </div>
+          <div id="calendly-widget"></div>
+        </div>
+      </div>
+
+      <!-- Step 3: Confirmed -->
+      <div id="booking-confirmed">
+        <div class="card">
+          <div class="confirm-hero">
+            <div class="confirm-check">
+              <svg viewBox="0 0 24 24" fill="none" stroke="#2ecc8a" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="20 6 9 17 4 12"></polyline>
+              </svg>
+            </div>
+            <h2>You're booked!</h2>
+            <p>A confirmation has been sent to your email.</p>
+          </div>
+          <div id="confirm-details"></div>
+        </div>
+        <button class="btn btn-secondary" onclick="resetBooking()">Book another appointment</button>
+        <button class="btn btn-primary" onclick="finishActivity()">Done</button>
+      </div>
+
+    </div><!-- /tab-book -->
+
+    <!-- APPOINTMENTS TAB -->
+    <div id="tab-appointments">
+      <div class="notice-banner">
+        <span class="notice-banner-icon">ℹ️</span>
+        <span>To reschedule or cancel, check your booking confirmation email or contact the business directly.</span>
+      </div>
+      <div id="appts-loading" style="text-align:center;padding:40px 0">
+        <div class="spinner" style="margin:0 auto 12px"></div>
+        <p class="loading-text">Loading your appointments…</p>
+      </div>
+      <div id="appts-content" style="display:none">
+        <div class="card" id="card-upcoming" style="display:none">
+          <div class="card-title">Upcoming</div>
+          <div id="appt-upcoming"></div>
+        </div>
+        <div class="card" id="card-past" style="display:none">
+          <div class="card-title">Past</div>
+          <div id="appt-past"></div>
+        </div>
+        <div id="appt-empty" style="display:none" class="empty-state">
+          <div class="empty-icon">📅</div>
+          <p>No bookings yet. Head to the Book tab to make your first appointment.</p>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════════════
+//  STATE
+// ═══════════════════════════════════════════════════════
+const appState = {
+  CONFIG: {}, USER: {}, ACTIVITY: {}, ACTIVITY_RESPONSE: {},
+  QUESTIONS: [], API: '', AUTH: '',
+  received: new Set()
+}
+const REQUIRED = ['CONFIG','USER','ACTIVITY','ACTIVITY_RESPONSE','QUESTIONS']
+let appReady = false
+
+// ═══════════════════════════════════════════════════════
+//  COGNISS BRIDGE
+// ═══════════════════════════════════════════════════════
+const isNative = typeof window.ReactNativeWebView !== 'undefined'
+
+function postToApp(key, data = null) {
+  const text = JSON.stringify({ key, data })
+  if (isNative) window.ReactNativeWebView.postMessage(text)
+  else window.parent.postMessage(text, '*')
+}
+
+// REST_REQUEST promise helper
+let _reqId = 0
+const _pending = {}
+
+function restRequest(method, model, data, specialParams) {
+  return new Promise((resolve, reject) => {
+    const id = 'req-' + (++_reqId)
+    _pending[id] = { resolve, reject }
+    const text = JSON.stringify({ key: 'REST_REQUEST', method, model, data, id, specialParams: specialParams || null })
+    if (isNative) window.ReactNativeWebView.postMessage(text)
+    else window.parent.postMessage(text, '*')
+  })
+}
+
+function handleMsg(msg) {
+  const { key, data } = msg
+  switch (key) {
+    case 'API':              appState.API = data || ''; break
+    case 'AUTH':             appState.AUTH = data || ''; break
+    case 'CONFIG':           appState.CONFIG = data || {};            mark('CONFIG'); break
+    case 'USER':             appState.USER = data || {};              mark('USER'); break
+    case 'ACTIVITY':         appState.ACTIVITY = data || {};          mark('ACTIVITY'); break
+    case 'ACTIVITY_RESPONSE':appState.ACTIVITY_RESPONSE = data || {}; mark('ACTIVITY_RESPONSE'); break
+    case 'QUESTIONS':
+      appState.QUESTIONS = Array.isArray(data) ? data : []
+      mark('QUESTIONS'); break
+    case 'QUESTION':
+      if (!appState.received.has('QUESTIONS')) {
+        appState.QUESTIONS = data ? [data] : []
+        mark('QUESTIONS')
+      }
+      break
+    case 'REQUEST_RESPONSE': {
+      const p = _pending[msg.id]
+      if (p) { delete _pending[msg.id]; msg.error ? p.reject(new Error(msg.error)) : p.resolve(msg.data) }
+      break
+    }
+  }
+}
+
+function mark(k) {
+  appState.received.add(k)
+  if (!appReady && REQUIRED.every(r => appState.received.has(r))) { appReady = true; initApp() }
+}
+
+function onMsg(e) {
+  try {
+    // Handle Calendly postMessage events (they are plain objects, not JSON strings sometimes)
+    const d = typeof e.data === 'string' ? JSON.parse(e.data) : e.data
+    if (!d) return
+    // Calendly events have d.event like 'calendly.event_scheduled'
+    if (d.event && d.event.startsWith('calendly.')) {
+      handleCalendlyEvent(d); return
+    }
+    // Cogniss bridge messages have d.key
+    if (d.key) handleMsg(d)
+  } catch (_) {}
+}
+document.addEventListener('message', onMsg)
+window.addEventListener('message', onMsg)
+postToApp('READY_DYNAMIC_MEDIA')
+
+// ═══════════════════════════════════════════════════════
+//  GLOBALS
+// ═══════════════════════════════════════════════════════
+const CAPI = 'https://api.calendly.com'
+let cToken = null, orgUri = null, selectedEvent = null
+
+// ═══════════════════════════════════════════════════════
+//  INIT
+// ═══════════════════════════════════════════════════════
+async function initApp() {
+  cToken = appState.CONFIG.calendlyToken || appState.CONFIG.token || null
+  if (!cToken) { fatalError('No Calendly API token. Add "calendlyToken" to the activity custom config JSON.'); return }
+
+  document.getElementById('app-title').textContent    = appState.CONFIG.title    || 'Book an Appointment'
+  document.getElementById('app-subtitle').textContent = appState.CONFIG.subtitle || 'Select a time that works for you'
+
+  try {
+    const me = await cFetch('/users/me')
+    orgUri = me.resource.current_organization
+    showScreen('screen-main')
+    loadEventTypes()
+  } catch (e) {
+    fatalError('Could not connect to Calendly. Check your API token. (' + e.message + ')')
+  }
+}
+
+// ═══════════════════════════════════════════════════════
+//  CALENDLY API
+// ═══════════════════════════════════════════════════════
+async function cFetch(path, opts = {}) {
+  const res = await fetch(CAPI + path, {
+    ...opts,
+    headers: { 'Authorization': 'Bearer ' + cToken, 'Content-Type': 'application/json', ...(opts.headers || {}) }
+  })
+  if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.message || 'HTTP ' + res.status) }
+  return res.json()
+}
+
+// ═══════════════════════════════════════════════════════
+//  EVENT TYPES
+// ═══════════════════════════════════════════════════════
+async function loadEventTypes() {
+  const list = document.getElementById('event-list')
+  list.innerHTML = '<div class="empty-state"><div class="spinner" style="margin:0 auto"></div></div>'
+  try {
+    const data  = await cFetch('/event_types?organization=' + encodeURIComponent(orgUri) + '&active=true')
+    const types = data.collection || []
+    if (!types.length) {
+      list.innerHTML = '<div class="empty-state"><div class="empty-icon">📭</div><p>No active event types found.</p></div>'
+      return
+    }
+    list.innerHTML = types.map((et, i) => `
+      <div class="event-item" style="animation-delay:${i*0.06}s" onclick='openWidget(${JSON.stringify(JSON.stringify(et))})'>
+        <div class="event-dot" style="background:${et.color||'var(--accent)'}"></div>
+        <div class="event-info">
+          <div class="event-name">${et.name}</div>
+          <div class="event-meta">${et.duration} min${et.description_plain ? ' · ' + et.description_plain.slice(0,55) + (et.description_plain.length>55?'…':'') : ''}</div>
+        </div>
+        <div class="event-arrow">›</div>
+      </div>`).join('')
+  } catch (e) {
+    list.innerHTML = '<div class="notice error">⚠️ ' + e.message + '</div>'
+  }
+}
+
+// ═══════════════════════════════════════════════════════
+//  CALENDLY WIDGET
+// ═══════════════════════════════════════════════════════
+function openWidget(etJson) {
+  selectedEvent = JSON.parse(etJson)
+  document.getElementById('event-picker').style.display       = 'none'
+  document.getElementById('calendly-container').style.display = 'block'
+  document.getElementById('booking-confirmed').style.display  = 'none'
+
+  const overlay  = document.getElementById('widget-overlay')
+  const widgetEl = document.getElementById('calendly-widget')
+  overlay.classList.remove('hidden')
+  widgetEl.classList.remove('ready')
+  widgetEl.innerHTML = ''
+
+  // Prefill from Cogniss user profile — name and email auto-populated
+  const u = appState.USER
+  const prefill = {
+    name:       u.displayName || u.username || '',
+    email:      u.email       || '',
+    customAnswers: {
+      // Pass any extra profile fields Calendly custom questions may use
+      a1: u.profile?.phone || u.phone || ''
+    }
+  }
+
+  function tryInit() {
+    if (window.Calendly) {
+      window.Calendly.initInlineWidget({ url: selectedEvent.scheduling_url, parentElement: widgetEl, prefill, utm: {} })
+    } else {
+      setTimeout(tryInit, 300)
+    }
+  }
+  tryInit()
+}
+
+function backToEvents() {
+  document.getElementById('event-picker').style.display       = 'block'
+  document.getElementById('calendly-container').style.display = 'none'
+  document.getElementById('booking-confirmed').style.display  = 'none'
+  document.getElementById('calendly-widget').innerHTML = ''
+  selectedEvent = null
+}
+
+// ═══════════════════════════════════════════════════════
+//  CALENDLY EVENTS
+// ═══════════════════════════════════════════════════════
+function handleCalendlyEvent(d) {
+  // Hide overlay when Calendly UI is visible
+  if (d.event === 'calendly.profile_page_viewed' ||
+      d.event === 'calendly.event_type_viewed'   ||
+      d.event === 'calendly.date_and_time_selected') {
+    document.getElementById('widget-overlay').classList.add('hidden')
+    document.getElementById('calendly-widget').classList.add('ready')
+  }
+  if (d.event === 'calendly.event_scheduled') {
+    onCalendlyBooked(d.payload)
+  }
+}
+
+// ═══════════════════════════════════════════════════════
+//  BOOKING CONFIRMED — save to Cogniss via REST_REQUEST
+// ═══════════════════════════════════════════════════════
+//
+//  Strategy: save the booking JSON into the ActivityResponse
+//  bookmark via REST_REQUEST. This works without QUIT, so the
+//  user stays on the confirmation screen. When they tap Done,
+//  we send QUESTION_RESPONSE + QUIT together cleanly.
+//
+//  My Appointments reads bookmarks from all past ActivityResponses.
+//
+let pendingBooking = null
+
+async function onCalendlyBooked(payload) {
+  const now = new Date()
+
+  pendingBooking = {
+    eventTypeName: selectedEvent ? selectedEvent.name     : 'Appointment',
+    duration:      selectedEvent ? selectedEvent.duration : null,
+    eventUri:      payload?.event?.uri                   || null,
+    inviteeUri:    payload?.invitee?.uri                 || null,
+    inviteeName:   appState.USER.displayName             || '',
+    inviteeEmail:  appState.USER.email                   || '',
+    bookedAt:      now.toISOString()
+  }
+
+  // Show confirmation immediately — no crash, user stays in template
+  document.getElementById('calendly-container').style.display = 'none'
+  document.getElementById('booking-confirmed').style.display  = 'block'
+  renderConfirmation(pendingBooking)
+
+  // Save to ActivityResponse bookmark via REST_REQUEST
+  // This persists without needing QUIT
+  try {
+    // Read existing bookmarks array (in case user booked multiple times)
+    let bookmarks = []
+    const existing = appState.ACTIVITY_RESPONSE.bookmark
+    try { bookmarks = JSON.parse(existing) || [] } catch (_) { bookmarks = [] }
+    if (!Array.isArray(bookmarks)) bookmarks = []
+    bookmarks.unshift(pendingBooking)  // newest first
+
+    await restRequest('put', 'ActivityResponse', {
+      id:       appState.ACTIVITY_RESPONSE.id,
+      bookmark: JSON.stringify(bookmarks)
+    })
+  } catch (e) {
+    // Non-fatal — booking still happened in Calendly
+    postToApp('LOG', { message: 'Bookmark save failed: ' + e.message })
+  }
+}
+
+function renderConfirmation(booking) {
+  const bookedDate = new Date(booking.bookedAt)
+  const dateStr = bookedDate.toLocaleDateString(undefined, { weekday:'long', year:'numeric', month:'long', day:'numeric' })
+  const timeStr = bookedDate.toLocaleTimeString(undefined, { hour:'numeric', minute:'2-digit' })
+  document.getElementById('confirm-details').innerHTML = `
+    <div class="detail-row">
+      <div class="detail-icon">📋</div>
+      <div><div class="detail-label">Appointment</div>
+           <div class="detail-value">${booking.eventTypeName}${booking.duration ? ' · ' + booking.duration + ' min' : ''}</div></div>
+    </div>
+    <div class="detail-row">
+      <div class="detail-icon">📅</div>
+      <div><div class="detail-label">Booked on</div>
+           <div class="detail-value">${dateStr} at ${timeStr}</div></div>
+    </div>
+    <div class="detail-row">
+      <div class="detail-icon">👤</div>
+      <div><div class="detail-label">Name</div>
+           <div class="detail-value">${booking.inviteeName || '—'}</div></div>
+    </div>
+    <div class="detail-row">
+      <div class="detail-icon">✉️</div>
+      <div><div class="detail-label">Email</div>
+           <div class="detail-value">${booking.inviteeEmail || '—'}</div></div>
+    </div>
+    <div class="detail-row">
+      <div class="detail-icon">✅</div>
+      <div><div class="detail-label">Status</div>
+           <div class="detail-value" style="color:var(--success)">Confirmed — saved to your appointments</div></div>
+    </div>
+  `
+}
+
+// ═══════════════════════════════════════════════════════
+//  MY APPOINTMENTS
+// ═══════════════════════════════════════════════════════
+//
+//  Step 1 — Read all saved booking references from Cogniss:
+//    a) QuestionResponse.text (JSON) from all ActivityResponses
+//    b) ActivityResponse.bookmark (JSON array) as fallback
+//  Step 2 — For each saved inviteeUri, call Calendly API to get
+//    the real scheduled event (start time, status, location)
+//  Step 3 — Render with real data where available, fallback to
+//    saved data where Calendly lookup fails
+//
+async function loadAppointments() {
+  document.getElementById('appts-loading').style.display = 'block'
+  document.getElementById('appts-content').style.display = 'none'
+  document.getElementById('card-upcoming').style.display = 'none'
+  document.getElementById('card-past').style.display     = 'none'
+  document.getElementById('appt-empty').style.display    = 'none'
+
+  // ── Step 1: collect all saved booking refs from Cogniss ──
+  const savedBookings = []
+
+  try {
+    // All ActivityResponses for this activity + user (complete and incomplete)
+    const arResult = await restRequest('list', 'ActivityResponse', {
+      activity: appState.ACTIVITY.id,
+      user:     appState.USER.id,
+      sort:     '-date',
+      limit:    50
+    })
+    const allAttempts = arResult.items || []
+
+    // Fetch QuestionResponses in parallel for every attempt
+    const qrResults = await Promise.all(
+      allAttempts.map(ar =>
+        restRequest('list', 'QuestionResponse', {
+          parentActivityResponse: ar.id,
+          user:  appState.USER.id,
+          sort:  '-date',
+          limit: 5         // up to 5 QRs per attempt
+        }).catch(() => ({ items: [] }))
+      )
+    )
+
+    // Extract booking objects from QR text fields
+    allAttempts.forEach((ar, i) => {
+      const items = qrResults[i]?.items || []
+      items.forEach(qr => {
+        if (!qr.text) return
+        try {
+          const b = JSON.parse(qr.text)
+          if (b && b.bookedAt) savedBookings.push(b)
+        } catch (_) {}
+      })
+
+      // Also check bookmark on each ActivityResponse
+      if (ar.bookmark) {
+        try {
+          const bm  = JSON.parse(ar.bookmark)
+          const arr = Array.isArray(bm) ? bm : [bm]
+          arr.forEach(b => { if (b && b.bookedAt) savedBookings.push(b) })
+        } catch (_) {}
+      }
+    })
+  } catch (e) {
+    postToApp('LOG', { message: 'loadAppointments QR fetch error: ' + e.message })
+  }
+
+  // Deduplicate saved bookings by inviteeUri then bookedAt
+  const seenKeys = new Set()
+  const uniqueSaved = savedBookings.filter(b => {
+    const key = b.inviteeUri || b.bookedAt
+    if (seenKeys.has(key)) return false
+    seenKeys.add(key); return true
+  })
+
+  if (!uniqueSaved.length) { showApptsEmpty(); return }
+
+  // ── Step 2: fetch ALL live events for this user from Calendly ──
+  //
+  // When a manager reschedules, Calendly CANCELS the original event
+  // and creates a brand-new event with a new URI. Our saved inviteeUri
+  // points to the old cancelled event — we'd never see the rescheduled one.
+  //
+  // Fix: fetch ALL scheduled events for this user's email from Calendly
+  // (both active and cancelled), then match against saved bookings by
+  // event type name. This catches reschedules automatically.
+  //
+  let allCalendlyEvents = []  // all events from Calendly for this user
+  try {
+    const userEmail = appState.USER.email
+    if (userEmail && orgUri) {
+      // Fetch active events
+      const [activeRes, cancelledRes] = await Promise.allSettled([
+        cFetch('/scheduled_events?organization=' + encodeURIComponent(orgUri)
+          + '&invitee_email=' + encodeURIComponent(userEmail)
+          + '&status=active&count=100&sort=start_time:desc'),
+        cFetch('/scheduled_events?organization=' + encodeURIComponent(orgUri)
+          + '&invitee_email=' + encodeURIComponent(userEmail)
+          + '&status=canceled&count=100&sort=start_time:desc')
+      ])
+      const active    = activeRes.status    === 'fulfilled' ? (activeRes.value.collection    || []) : []
+      const cancelled = cancelledRes.status === 'fulfilled' ? (cancelledRes.value.collection || []) : []
+      allCalendlyEvents = [...active, ...cancelled]
+    }
+  } catch (_) {}
+
+  // Build a lookup map: eventTypeName (lowercased) → array of live events
+  // This lets us find rescheduled events that share the same event type name
+  const liveByName = {}
+  allCalendlyEvents.forEach(ev => {
+    const key = (ev.name || '').toLowerCase().trim()
+    if (!liveByName[key]) liveByName[key] = []
+    liveByName[key].push(ev)
+  })
+
+  // Also build a lookup by event URI for direct matches
+  const liveByUri = {}
+  allCalendlyEvents.forEach(ev => { liveByUri[ev.uri] = ev })
+
+  // ── Step 3: match each saved booking to live Calendly event ──
+  //
+  // Matching priority:
+  //   1. Direct URI match (original booking, not rescheduled)
+  //   2. Name match — find the most relevant live event with the same
+  //      event type name (handles reschedules — new URI, same name)
+  //      Pick the active one closest in time; if all cancelled pick latest
+  //
+  const now      = new Date()
+  const upcoming = []
+  const past     = []
+  const usedUris = new Set()  // prevent same live event showing twice
+
+  // Also fetch invitee details for direct URI matches to get cancel reason
+  const inviteeFetches = {}
+
+  for (const saved of uniqueSaved) {
+    let liveEvent = null
+    let matchType = 'none'
+
+    // 1. Direct event URI match
+    if (saved.eventUri && liveByUri[saved.eventUri]) {
+      liveEvent = liveByUri[saved.eventUri]
+      matchType = 'direct'
+    }
+
+    // 2. Name match — find best live event with same name
+    if (!liveEvent) {
+      const nameKey = (saved.eventTypeName || '').toLowerCase().trim()
+      const candidates = (liveByName[nameKey] || []).filter(ev => !usedUris.has(ev.uri))
+      if (candidates.length) {
+        // Prefer active over cancelled
+        const active = candidates.filter(ev => ev.status === 'active')
+        const pool   = active.length ? active : candidates
+        // Pick soonest upcoming, or most recent past
+        pool.sort((a, b) => new Date(a.start_time) - new Date(b.start_time))
+        const upcoming_ = pool.filter(ev => new Date(ev.start_time) >= now)
+        liveEvent = upcoming_.length ? upcoming_[0] : pool[pool.length - 1]
+        matchType = 'name'
+      }
+    }
+
+    if (liveEvent) usedUris.add(liveEvent.uri)
+
+    // Fetch invitee record for cancel reason (only for direct matches where we have inviteeUri)
+    let invitee = null
+    if (saved.inviteeUri && matchType === 'direct') {
+      try {
+        const invPath = saved.inviteeUri.replace('https://api.calendly.com', '')
+        const invRes  = await cFetch(invPath)
+        invitee = invRes.resource || null
+      } catch (_) {}
+    }
+
+    // Determine status
+    const eventCancelled   = liveEvent?.status === 'canceled'
+    const inviteeCancelled = invitee?.canceled === true
+    const isCancelled      = eventCancelled || inviteeCancelled
+    const isRescheduled    = matchType === 'name' && liveEvent && !isCancelled
+                          && saved.inviteeUri  // had a previous booking URI
+
+    const cancelReason = liveEvent?.cancellation?.reason
+                      || invitee?.cancellation?.reason
+                      || null
+
+    const startTime = liveEvent?.start_time ? new Date(liveEvent.start_time) : null
+    const endTime   = liveEvent?.end_time   ? new Date(liveEvent.end_time)   : null
+    const duration  = (startTime && endTime)
+      ? Math.round((endTime - startTime) / 60000) + ' min'
+      : (saved.duration ? saved.duration + ' min' : '')
+
+    const booking = {
+      name:          liveEvent?.name || saved.eventTypeName || 'Appointment',
+      status:        isCancelled ? 'canceled' : 'active',
+      isRescheduled,
+      cancelReason,
+      startTime,
+      endTime,
+      duration,
+      bookedAt:      new Date(saved.bookedAt),
+      email:         invitee?.email || saved.inviteeEmail || appState.USER.email || '',
+      userName:      invitee?.name  || saved.inviteeName  || appState.USER.displayName || '',
+      hasLive:       !!liveEvent
+    }
+
+    const refTime = startTime || booking.bookedAt
+    if (!isCancelled && refTime >= now) upcoming.push(booking)
+    else past.push(booking)
+  }
+
+  document.getElementById('appts-loading').style.display = 'none'
+  document.getElementById('appts-content').style.display = 'block'
+
+  if (upcoming.length) {
+    document.getElementById('card-upcoming').style.display = 'block'
+    document.getElementById('appt-upcoming').innerHTML = upcoming.map(renderBookingCard).join('')
+  }
+  if (past.length) {
+    document.getElementById('card-past').style.display = 'block'
+    document.getElementById('appt-past').innerHTML = past.map(renderBookingCard).join('')
+  }
+  if (!upcoming.length && !past.length) showApptsEmpty()
+}
+
+function renderBookingCard(b) {
+  const isCancelled = b.status === 'canceled'
+  const now         = new Date()
+  const badgeCls    = isCancelled ? 'cancelled'
+                    : (b.startTime && b.startTime >= now) ? 'upcoming' : 'past'
+  const badgeLbl    = isCancelled ? 'Cancelled'
+                    : badgeCls === 'upcoming' ? 'Upcoming' : 'Past'
+  const cardCls     = isCancelled ? 'past' : badgeCls
+
+  let timeStr = ''
+  if (b.startTime) {
+    const ds = b.startTime.toLocaleDateString(undefined, { weekday:'short', month:'short', day:'numeric', year:'numeric' })
+    const ts = b.startTime.toLocaleTimeString(undefined, { hour:'numeric', minute:'2-digit' })
+    timeStr = ds + ' at ' + ts
+  } else {
+    const ds = b.bookedAt.toLocaleDateString(undefined, { weekday:'short', month:'short', day:'numeric', year:'numeric' })
+    timeStr = 'Booked ' + ds
+  }
+
+  const liveTag = b.isRescheduled
+    ? '<span style="font-size:10px;color:var(--warn,#f5a623);font-weight:600;margin-left:6px">↻ RESCHEDULED</span>'
+    : b.hasLive
+      ? '<span style="font-size:10px;color:var(--success);font-weight:600;margin-left:6px">● LIVE</span>'
+      : '<span style="font-size:10px;color:var(--ink-faint);font-weight:600;margin-left:6px">● SAVED</span>'
+
+  const cancelBlock = isCancelled ? `
+    <div style="margin-top:10px;padding:10px 12px;background:var(--error-light);border-radius:8px;font-size:13px;color:var(--error)">
+      <strong>This appointment was cancelled.</strong>
+      ${b.cancelReason ? '<div style="margin-top:4px;color:var(--ink-soft)">' + b.cancelReason + '</div>' : ''}
+      <div style="margin-top:6px;font-size:12px;color:var(--ink-faint)">
+        Check your email or contact the business to rebook.
+      </div>
+    </div>` : ''
+
+  return `
+    <div class="appt-item ${cardCls}">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+        <span class="appt-badge ${badgeCls}" style="margin:0">${badgeLbl}</span>
+        ${liveTag}
+      </div>
+      <div class="appt-name">${b.name}${b.duration ? ' <span style="font-weight:400;color:var(--ink-soft);font-size:13px">· ' + b.duration + '</span>' : ''}</div>
+      ${b.userName ? '<div class="appt-time">👤 ' + b.userName + '</div>' : ''}
+      ${b.email    ? '<div class="appt-time">✉️ ' + b.email    + '</div>' : ''}
+      <div class="appt-time">📅 ${timeStr}</div>
+      ${cancelBlock}
+    </div>`
+}
+
+function showApptsEmpty() {
+  document.getElementById('appts-loading').style.display = 'none'
+  document.getElementById('appts-content').style.display = 'block'
+  document.getElementById('appt-empty').style.display    = 'block'
+}
+
+// ═══════════════════════════════════════════════════════
+//  NAV HELPERS
+// ═══════════════════════════════════════════════════════
+function switchTab(tab) {
+  document.getElementById('tab-book').style.display         = tab === 'book'         ? 'block' : 'none'
+  document.getElementById('tab-appointments').style.display = tab === 'appointments' ? 'block' : 'none'
+  document.getElementById('tab-btn-book').classList.toggle('active',         tab === 'book')
+  document.getElementById('tab-btn-appointments').classList.toggle('active', tab === 'appointments')
+  if (tab === 'appointments') loadAppointments()
+}
+
+function resetBooking() {
+  selectedEvent = null
+  document.getElementById('booking-confirmed').style.display  = 'none'
+  document.getElementById('calendly-widget').innerHTML         = ''
+  document.getElementById('event-picker').style.display       = 'block'
+  loadEventTypes()
+}
+
+async function finishActivity() {
+  // If there's a pending booking and a question, save it now before closing
+  if (pendingBooking && appState.QUESTIONS.length > 0) {
+    const q = appState.QUESTIONS[0]
+    postToApp('QUESTION_RESPONSE', {
+      index:    0,
+      question: q._id,
+      options:  [],
+      text:     JSON.stringify(pendingBooking),
+      duration: 0
+    })
+    await new Promise(r => setTimeout(r, 500))
+  }
+  postToApp('QUIT', { completeState: 'COMPLETE' })
+}
+
+function showScreen(id) {
+  document.querySelectorAll('.screen').forEach(s => {
+    s.classList.remove('active')
+    s.style.display = 'none'
+  })
+  const el = document.getElementById(id)
+  el.classList.add('active')
+  el.style.display = (id === 'screen-loading') ? 'flex' : 'block'
+}
+
+function fatalError(msg) { document.getElementById('error-msg').textContent = msg; showScreen('screen-error') }
+
+// ═══════════════════════════════════════════════════════
+//  DEV FALLBACK (testing outside Cogniss via ?token=xxx)
+// ═══════════════════════════════════════════════════════
+setTimeout(() => {
+  if (!appReady) {
+    const t = new URLSearchParams(location.search).get('token')
+    if (t) {
+      appState.CONFIG           = { calendlyToken: t }
+      appState.USER             = { id: 'dev-user', displayName: 'Test User', email: 'test@example.com' }
+      appState.ACTIVITY         = { id: 'dev-activity' }
+      appState.ACTIVITY_RESPONSE= { id: 'dev-ar' }
+      appState.QUESTIONS        = []
+      appReady = true; initApp()
+    } else {
+      fatalError('No config received. For testing, add ?token=YOUR_CALENDLY_TOKEN to the URL.')
+    }
+  }
+}, 3000)
+</script>
+</body>
+</html>
