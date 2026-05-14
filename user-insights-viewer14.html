@@ -1,0 +1,812 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>User Insights Viewer</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --primary: #4F46E5;
+      --primary-light: #EEF2FF;
+      --primary-dark: #3730A3;
+      --surface: #FFFFFF;
+      --surface-2: #F8FAFC;
+      --border: #E2E8F0;
+      --text: #1E293B;
+      --text-muted: #64748B;
+      --text-light: #94A3B8;
+      --success: #10B981;
+      --warning: #F59E0B;
+      --radius: 12px;
+      --radius-sm: 8px;
+      --shadow: 0 1px 3px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.04);
+      --shadow-md: 0 4px 12px rgba(0,0,0,0.10), 0 2px 4px rgba(0,0,0,0.06);
+    }
+
+    html, body {
+      height: 100%;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: var(--surface-2);
+      color: var(--text);
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* ── Layout ── */
+    .page {
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      padding: 32px 16px;
+      max-width: 640px;
+      margin: 0 auto;
+      gap: 20px;
+    }
+
+    /* ── Header ── */
+    .header {
+      text-align: center;
+    }
+    .header-icon {
+      width: 52px; height: 52px;
+      background: var(--primary);
+      border-radius: 14px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 12px;
+    }
+    .header-icon svg { color: #fff; }
+    .header h1 { font-size: 20px; font-weight: 700; color: var(--text); }
+    .header p  { font-size: 14px; color: var(--text-muted); margin-top: 4px; }
+
+    /* ── Cards ── */
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      overflow: hidden;
+    }
+    .card-header {
+      padding: 16px 20px 12px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .card-header-icon {
+      width: 32px; height: 32px;
+      background: var(--primary-light);
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+    .card-header-icon svg { color: var(--primary); }
+    .card-title { font-size: 14px; font-weight: 600; color: var(--text); }
+    .card-subtitle { font-size: 12px; color: var(--text-muted); margin-top: 1px; }
+    .card-body { padding: 16px 20px; }
+
+    /* ── Back button ── */
+    .back-btn {
+      display: inline-flex; align-items: center; gap: 6px;
+      font-size: 13px; font-weight: 500; color: var(--primary);
+      background: none; border: none; cursor: pointer; padding: 0;
+      margin-bottom: 4px;
+    }
+    .back-btn:hover { color: var(--primary-dark); }
+
+    /* ── User list ── */
+    .user-list { display: flex; flex-direction: column; gap: 2px; }
+    .user-item {
+      display: flex; align-items: center; gap: 12px;
+      padding: 10px 20px; cursor: pointer;
+      transition: background 0.15s;
+      border-radius: 0;
+    }
+    .user-item:hover { background: var(--surface-2); }
+    .user-item:first-child { border-radius: var(--radius-sm) var(--radius-sm) 0 0; }
+    .user-item:last-child  { border-radius: 0 0 var(--radius-sm) var(--radius-sm); }
+    .avatar {
+      width: 38px; height: 38px; border-radius: 50%;
+      background: var(--primary-light);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 14px; font-weight: 700; color: var(--primary);
+      flex-shrink: 0;
+    }
+    .user-info { flex: 1; min-width: 0; }
+    .user-name  { font-size: 14px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .user-meta  { font-size: 12px; color: var(--text-muted); }
+    .chevron { color: var(--text-light); }
+    .user-meta-row { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-top: 2px; }
+    .count-pill {
+      display: inline-flex; align-items: center;
+      padding: 1px 7px; border-radius: 99px;
+      background: var(--primary-light); color: var(--primary);
+      font-size: 11px; font-weight: 600;
+    }
+
+    /* ── Response list ── */
+    .response-list { display: flex; flex-direction: column; gap: 12px; }
+    .response-item {
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 14px 16px;
+    }
+    .response-meta {
+      display: flex; align-items: center; gap: 6px;
+      font-size: 11px; color: var(--text-muted); margin-bottom: 8px;
+      flex-wrap: wrap;
+    }
+    .response-meta svg { flex-shrink: 0; }
+    .badge {
+      display: inline-flex; align-items: center; gap: 4px;
+      padding: 2px 8px; border-radius: 99px; font-size: 11px; font-weight: 600;
+    }
+    .badge-complete { background: #DCFCE7; color: #15803D; }
+    .badge-incomplete { background: #FEF9C3; color: #92400E; }
+    .badge-incorrect  { background: #FEE2E2; color: #B91C1C; }
+    .response-answers { display: flex; flex-direction: column; gap: 6px; }
+    .answer-row {
+      font-size: 13px; color: var(--text);
+      padding: 8px 10px;
+      background: var(--surface);
+      border-radius: 6px;
+      border-left: 3px solid var(--primary);
+    }
+    .answer-label { font-size: 11px; color: var(--text-muted); margin-bottom: 2px; }
+    .answer-text  { font-weight: 500; }
+    .dot { color: var(--text-light); }
+
+    /* ── States ── */
+    .state-box {
+      display: flex; flex-direction: column; align-items: center;
+      gap: 10px; padding: 32px 20px; text-align: center;
+    }
+    .state-box svg { color: var(--text-light); }
+    .state-box p   { font-size: 14px; color: var(--text-muted); }
+    .state-box small { font-size: 12px; color: var(--text-light); }
+
+    /* ── Spinner ── */
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .spinner {
+      width: 28px; height: 28px;
+      border: 3px solid var(--border);
+      border-top-color: var(--primary);
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+    }
+
+    /* ── Done button ── */
+    .done-btn {
+      width: 100%; padding: 14px;
+      background: var(--primary); color: #fff;
+      border: none; border-radius: var(--radius-sm);
+      font-size: 15px; font-weight: 600; cursor: pointer;
+      transition: background 0.15s;
+    }
+    .done-btn:hover { background: var(--primary-dark); }
+
+    /* ── Divider ── */
+    .divider { height: 1px; background: var(--border); margin: 0 -20px; }
+
+    /* ── Profile rows ── */
+    .profile-row {
+      display: flex; justify-content: space-between; align-items: center;
+      padding: 12px 20px; gap: 16px;
+    }
+    .profile-row-border { border-bottom: 1px solid var(--border); }
+    .profile-label { font-size: 12px; color: var(--text-muted); white-space: nowrap; }
+    .profile-value { font-size: 13px; font-weight: 500; color: var(--text); text-align: right; word-break: break-all; }
+
+    /* ── Footer spacer ── */
+    .spacer { flex: 1; }
+
+    /* ── Debug overlay ── */
+    #debug-panel {
+      position: fixed; bottom: 0; left: 0; right: 0;
+      max-height: 220px; overflow-y: auto;
+      background: rgba(0,0,0,0.85); color: #a8ff78;
+      font-family: monospace; font-size: 11px;
+      padding: 8px 10px; z-index: 9999;
+      display: none;
+    }
+    #debug-panel.visible { display: block; }
+    .debug-line { padding: 1px 0; border-bottom: 1px solid rgba(255,255,255,0.05); }
+    #debug-toggle {
+      position: fixed; bottom: 8px; right: 8px;
+      background: rgba(0,0,0,0.6); color: #fff;
+      border: none; border-radius: 6px; font-size: 11px;
+      padding: 4px 8px; cursor: pointer; z-index: 10000;
+    }
+  </style>
+</head>
+<body>
+
+<div class="page" id="app">
+  <!-- Loading -->
+  <div class="state-box" id="view-loading">
+    <div class="spinner"></div>
+    <p>Loading…</p>
+    <small id="debug-status" style="font-size:11px;color:#94A3B8;margin-top:4px;max-width:280px;text-align:center">Waiting for init messages…</small>
+  </div>
+</div>
+
+<!-- Debug panel lives outside #app so renderApp() never wipes it -->
+<div id="debug-panel"></div>
+<button id="debug-toggle" onclick="toggleDebug()">🐛 Debug</button>
+
+<script>
+/* ═══════════════════════════════════════════════════
+   STATE
+═══════════════════════════════════════════════════ */
+const state = {}
+let _reqId = 0
+const _pending = {}
+const isNative = typeof window.ReactNativeWebView !== 'undefined'
+
+// init messages we need before we can start
+// Only wait for USER and ACTIVITY — the minimum needed to fetch connected users.
+// CONFIG, ACTIVITY_RESPONSE and others are used defensively if present.
+const REQUIRED = ['USER', 'ACTIVITY']
+const received  = new Set()
+let   _started  = false   // guard against startTemplate being called twice
+
+// runtime
+let sharedUsers      = []    // users from code-sharing
+let sharedUsersError = null  // set if the initial fetch fails
+let selectedUser     = null
+let activityId       = null  // set from CONFIG.activityId
+
+/* ═══════════════════════════════════════════════════
+   DEBUG
+═══════════════════════════════════════════════════ */
+const _debugLines = []
+function debugLog(msg) {
+  const ts = new Date().toISOString().slice(11,23)
+  const line = `[${ts}] ${msg}`
+  _debugLines.push(line)
+  // Panel lives outside #app — always safe to query
+  const panel = document.getElementById('debug-panel')
+  if (panel) {
+    const div = document.createElement('div')
+    div.className = 'debug-line'
+    div.textContent = line
+    panel.appendChild(div)
+    panel.scrollTop = panel.scrollHeight
+  }
+  console.log('[DBG]', msg)
+  // Update status text if the loading screen is still visible (it's inside #app and may be gone)
+  try {
+    const sub = document.getElementById('debug-status')
+    if (sub) sub.textContent = msg
+  } catch(e) {}
+}
+function toggleDebug() {
+  const p = document.getElementById('debug-panel')
+  p.classList.toggle('visible')
+}
+
+/* ═══════════════════════════════════════════════════
+   BRIDGE
+═══════════════════════════════════════════════════ */
+function postToApp(key, data = null) {
+  const text = JSON.stringify({ key, data })
+  // Send to exactly one target — RN WebView takes priority, then parent iframe, then self
+  try {
+    if (window.ReactNativeWebView) { window.ReactNativeWebView.postMessage(text); return }
+  } catch(e) {}
+  try {
+    if (window.parent && window.parent !== window) { window.parent.postMessage(text, '*'); return }
+  } catch(e) {}
+  window.postMessage(text, '*')
+}
+
+function restRequest(method, model, data, specialParams) {
+  return new Promise((resolve, reject) => {
+    const id = 'req-' + (++_reqId)
+    _pending[id] = { resolve, reject }
+    const text = JSON.stringify({ key: 'REST_REQUEST', method, model, data, id, specialParams: specialParams || null })
+    try {
+      if (window.ReactNativeWebView) { window.ReactNativeWebView.postMessage(text); return }
+    } catch(e) {}
+    try {
+      if (window.parent && window.parent !== window) { window.parent.postMessage(text, '*'); return }
+    } catch(e) {}
+    window.postMessage(text, '*')
+  })
+}
+
+function onMessage(event) {
+  try {
+    // React Native may put data in event.data or event.nativeEvent.data
+    const raw = event.data ?? event.nativeEvent?.data
+    if (!raw || typeof raw !== 'string') return
+    const message = JSON.parse(raw)
+    if (!message || !message.key) return
+    debugLog('← ' + message.key)
+    handleMessage(message)
+  } catch (e) {
+    debugLog('parse error: ' + e)
+  }
+}
+document.addEventListener('message', onMessage)   // Android RN
+window.addEventListener('message',   onMessage)   // iOS RN + web
+
+function handleMessage(msg) {
+  switch (msg.key) {
+    case 'USER':              state.USER              = msg.data; markReceived('USER'); break
+    case 'CONFIG':            state.CONFIG            = msg.data || {}; markReceived('CONFIG'); break
+    case 'ACTIVITY':          state.ACTIVITY          = msg.data; markReceived('ACTIVITY'); break
+    case 'ACTIVITY_RESPONSE': state.ACTIVITY_RESPONSE = msg.data; markReceived('ACTIVITY_RESPONSE'); break
+    case 'API':               state.API               = msg.data; break
+    case 'AUTH':              state.AUTH              = msg.data; break
+    case 'REQUEST_RESPONSE': {
+      const p = _pending[msg.id]
+      if (p) {
+        delete _pending[msg.id]
+        if (msg.error) {
+          debugLog('REST error: ' + JSON.stringify(msg.error))
+          p.reject(new Error(typeof msg.error === 'string' ? msg.error : JSON.stringify(msg.error)))
+        } else {
+          p.resolve(msg.data)
+        }
+      }
+      break
+    }
+    default:
+      // log unknown keys so we know what the container is actually sending
+      debugLog('unknown key: ' + msg.key)
+  }
+}
+
+function markReceived(key) {
+  received.add(key)
+  debugLog('received: ' + key + ' | have: ' + [...received].join(','))
+  if (!_started && REQUIRED.every(k => received.has(k))) {
+    _started = true
+    debugLog('→ startTemplate()')
+    startTemplate()
+  }
+}
+
+/* ═══════════════════════════════════════════════════
+   INIT
+═══════════════════════════════════════════════════ */
+// Send ready signal immediately and again after short delays
+// to handle race conditions where the WebView isn't fully attached yet
+postToApp('READY_DYNAMIC_MEDIA')
+setTimeout(() => postToApp('READY_DYNAMIC_MEDIA'), 100)
+setTimeout(() => postToApp('READY_DYNAMIC_MEDIA'), 500)
+
+// Fallback: if init messages don't all arrive within 8s, start anyway with what we have
+setTimeout(() => {
+  if (!_started) {
+    _started = true
+    // Ensure minimum state exists
+    if (!state.USER)     state.USER     = {}
+    if (!state.ACTIVITY) state.ACTIVITY = {}
+    if (!state.CONFIG)   state.CONFIG   = {}
+    startTemplate()
+  }
+}, 8000)
+
+/* ═══════════════════════════════════════════════════
+   HELPERS
+═══════════════════════════════════════════════════ */
+function initials(name) {
+  if (!name) return '?'
+  return name.trim().split(/\s+/).map(w => w[0]).slice(0, 2).join('').toUpperCase()
+}
+
+function avatarColor(name) {
+  // deterministic hue from name
+  const colors = ['#4F46E5','#7C3AED','#DB2777','#059669','#D97706','#DC2626','#2563EB']
+  let hash = 0
+  for (let i = 0; i < (name || '').length; i++) hash = (hash * 31 + name.charCodeAt(i)) | 0
+  return colors[Math.abs(hash) % colors.length]
+}
+
+function formatDateTime(iso) {
+  if (!iso) return '—'
+  try {
+    const d = new Date(iso)
+    const date = d.toLocaleDateString(undefined, { day: '2-digit', month: 'short', year: 'numeric' })
+    const time = d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })
+    return `${date} · ${time}`
+  } catch { return iso }
+}
+
+function truncate(str, max = 80) {
+  if (!str) return ''
+  return str.length > max ? str.slice(0, max) + '…' : str
+}
+
+function getAnswerText(qr) {
+  if (qr.text)  return qr.text
+  if (qr.value !== undefined && qr.value !== null) return String(qr.value)
+  if (qr.option)  return qr.option.text || qr.option._id || '—'
+  if (qr.options) return qr.options.map(o => o.text || o._id).join(', ')
+  return '—'
+}
+
+/* ═══════════════════════════════════════════════════
+   RENDER HELPERS
+═══════════════════════════════════════════════════ */
+function renderApp(html) {
+  document.getElementById('app').innerHTML = html
+}
+
+function svgIcon(name) {
+  const icons = {
+    users: `<svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg>`,
+    list:  `<svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>`,
+    clock: `<svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>`,
+    chevron: `<svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"/></svg>`,
+    back: `<svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg>`,
+    person: `<svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>`,
+    empty: `<svg width="40" height="40" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M8 15s1.5-2 4-2 4 2 4 2"/><line x1="9" y1="9" x2="9.01" y2="9"/><line x1="15" y1="9" x2="15.01" y2="9"/></svg>`,
+    error: `<svg width="40" height="40" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>`,
+  }
+  return icons[name] || ''
+}
+
+/* ═══════════════════════════════════════════════════
+   VIEWS
+═══════════════════════════════════════════════════ */
+
+/* ── User List ── */
+function renderUserList() {
+  const userName = state.USER?.displayName || state.USER?.username || 'You'
+
+  let listHtml = ''
+  if (sharedUsersError) {
+    listHtml = `<div class="state-box">
+      ${svgIcon('error')}
+      <p>Could not load connected users</p>
+      <small>${escHtml(sharedUsersError)}</small>
+    </div>`
+  } else if (sharedUsers.length === 0) {
+    listHtml = `<div class="state-box">
+      ${svgIcon('empty')}
+      <p>No connected users found</p>
+      <small>Users appear here when they share their code with you via User Insights.</small>
+    </div>`
+  } else {
+    const items = sharedUsers.map((u, i) => {
+      // displayName is already resolved from profile.displayName in startTemplate
+      const name  = u.displayName || u.username || 'User'
+      const meta  = u.username ? `@${u.username}` : (u.email || '')
+      const bg    = avatarColor(name)
+      const qCount = u.questionCount ?? null
+      const aCount = u.attemptCount  ?? null
+      const countPill = qCount !== null
+        ? `<span class="count-pill">${aCount} attempt${aCount !== 1 ? 's' : ''} · ${qCount} answer${qCount !== 1 ? 's' : ''}</span>`
+        : ''
+      return `
+        <div class="user-item" onclick="selectUser(${i})">
+          <div class="avatar" style="background:${bg}20;color:${bg}">${initials(name)}</div>
+          <div class="user-info">
+            <div class="user-name">${escHtml(name)}</div>
+            <div class="user-meta-row">
+              ${meta ? `<span class="user-meta">${escHtml(meta)}</span>` : ''}
+              ${countPill}
+            </div>
+          </div>
+          <span class="chevron">${svgIcon('chevron')}</span>
+        </div>`
+    }).join('<div class="divider"></div>')
+
+    listHtml = `<div class="user-list">${items}</div>`
+  }
+
+  renderApp(`
+    <div class="page">
+      <div class="header">
+        <div class="header-icon">${svgIcon('users')}</div>
+        <h1>User Insights</h1>
+        <p>Connected users · ${escHtml(userName)}</p>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <div class="card-header-icon">${svgIcon('users')}</div>
+          <div>
+            <div class="card-title">Connected Users</div>
+            <div class="card-subtitle">${sharedUsers.length} user${sharedUsers.length !== 1 ? 's' : ''} sharing insights with you</div>
+          </div>
+        </div>
+        <div class="card-body" style="padding:8px 0;">
+          ${listHtml}
+        </div>
+      </div>
+
+      <div class="spacer"></div>
+      <button class="done-btn" onclick="quit()">Done</button>
+    </div>
+  `)
+}
+
+/* ── User Responses ── */
+async function renderUserResponses(userObj) {
+  const name = userObj.displayName || userObj.username || 'User'
+
+  // Show loading state
+  renderApp(`
+    <div class="page">
+      <button class="back-btn" onclick="goBack()">${svgIcon('back')} All users</button>
+      <div class="header">
+        <div class="header-icon" style="background:${avatarColor(name)};display:inline-flex;align-items:center;justify-content:center">
+          <span style="font-size:20px;font-weight:700;color:#fff">${initials(name)}</span>
+        </div>
+        <h1>${escHtml(name)}</h1>
+        <p>Loading responses…</p>
+      </div>
+      <div class="card">
+        <div class="card-body">
+          <div class="state-box"><div class="spinner"></div><p>Fetching question responses…</p></div>
+        </div>
+      </div>
+      <div class="spacer"></div>
+    </div>
+  `)
+
+  let responses = []
+  let errorMsg  = null
+
+  try {
+    // Fetch QuestionResponses directly for this user on the configured activity.
+    // This gives a flat list of every answer the user has submitted.
+    const result = await restRequest('list', 'QuestionResponse', {
+      activity: activityId,
+      user:     userObj.id,
+      sort:     '-date',
+      limit:    200
+    })
+    responses = result?.items || []
+    debugLog('QuestionResponse count: ' + responses.length)
+  } catch (e) {
+    const raw = e?.message || ''
+    errorMsg = (raw && raw !== 'true' && raw !== 'false') ? raw : 'Could not load responses for this user.'
+    debugLog('QuestionResponse error: ' + errorMsg)
+  }
+
+  // ── Profile card ──
+  const profileRows = [
+    { label: 'Display Name', value: userObj.displayName },
+    { label: 'Username',     value: userObj.username ? '@' + userObj.username : null },
+    { label: 'Email',        value: userObj.email },
+  ].filter(r => r.value)
+
+  const profileCardHtml = `
+    <div class="card">
+      <div class="card-header">
+        <div class="card-header-icon">${svgIcon('person')}</div>
+        <div>
+          <div class="card-title">Profile</div>
+          <div class="card-subtitle">User information</div>
+        </div>
+      </div>
+      <div class="card-body" style="padding:0">
+        ${profileRows.length === 0
+          ? '<div class="state-box" style="padding:20px"><p>No profile info available</p></div>'
+          : profileRows.map((r, i) => `
+            <div class="profile-row${i < profileRows.length - 1 ? ' profile-row-border' : ''}">
+              <div class="profile-label">${escHtml(r.label)}</div>
+              <div class="profile-value">${escHtml(r.value)}</div>
+            </div>`).join('')
+        }
+      </div>
+    </div>`
+
+  // ── Responses card ──
+  let responsesBodyHtml = ''
+  if (errorMsg) {
+    responsesBodyHtml = `<div class="state-box">
+      ${svgIcon('error')}
+      <p>Could not load responses</p>
+      <small>${escHtml(errorMsg)}</small>
+    </div>`
+  } else if (responses.length === 0) {
+    responsesBodyHtml = `<div class="state-box">
+      ${svgIcon('empty')}
+      <p>No responses yet</p>
+      <small>This user has not answered any questions in this activity.</small>
+    </div>`
+  } else {
+    const rows = responses.map(r => {
+      const questionText = r.question?.text || r.questionText || 'Question'
+      const answerText   = getAnswerText(r)
+      const dateStr      = formatDateTime(r.date || r.createdAt)
+      const correct      = r.correct
+      const correctBadge = correct === true
+        ? '<span class="badge badge-complete">Correct</span>'
+        : correct === false
+          ? '<span class="badge badge-incorrect">Incorrect</span>'
+          : ''
+
+      return `
+        <div class="response-item">
+          <div class="answer-label">${escHtml(truncate(questionText, 80))}</div>
+          <div class="answer-text" style="margin-top:4px">${escHtml(truncate(answerText, 160))}</div>
+          <div class="response-meta" style="margin-top:6px;margin-bottom:0">
+            ${svgIcon('clock')}
+            <span>${dateStr}</span>
+            ${correctBadge ? '<span class="dot">·</span>' + correctBadge : ''}
+          </div>
+        </div>`
+    }).join('')
+
+    responsesBodyHtml = `<div class="response-list">${rows}</div>`
+  }
+
+  renderApp(`
+    <div class="page">
+      <button class="back-btn" onclick="goBack()">${svgIcon('back')} All users</button>
+
+      <div class="header">
+        <div class="header-icon" style="background:${avatarColor(name)};display:inline-flex;align-items:center;justify-content:center">
+          <span style="font-size:20px;font-weight:700;color:#fff">${initials(name)}</span>
+        </div>
+        <h1>${escHtml(name)}</h1>
+        <p>${responses.length} question response${responses.length !== 1 ? 's' : ''}</p>
+      </div>
+
+      ${profileCardHtml}
+
+      <div class="card">
+        <div class="card-header">
+          <div class="card-header-icon">${svgIcon('list')}</div>
+          <div>
+            <div class="card-title">Question Responses</div>
+            <div class="card-subtitle">Most recent first</div>
+          </div>
+        </div>
+        <div class="card-body">
+          ${responsesBodyHtml}
+        </div>
+      </div>
+
+      <div class="spacer"></div>
+      <button class="done-btn" onclick="quit()">Done</button>
+    </div>
+  `)
+}
+
+
+/* ═══════════════════════════════════════════════════
+   ACTIONS
+═══════════════════════════════════════════════════ */
+function selectUser(index) {
+  selectedUser = sharedUsers[index]
+  renderUserResponses(selectedUser)
+}
+
+function goBack() {
+  selectedUser = null
+  renderUserList()
+}
+
+function quit() {
+  postToApp('QUIT', { completeState: 'COMPLETE' })
+}
+
+function escHtml(str) {
+  return String(str || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')
+}
+
+/* ═══════════════════════════════════════════════════
+   START
+═══════════════════════════════════════════════════ */
+async function startTemplate() {
+  // Resolve the target activity ID from CONFIG (creator sets this)
+  activityId = state.CONFIG?.activityId || state.ACTIVITY?.id
+  sharedUsersError = null
+
+  // Show loading indicator while we fetch connected users
+  renderApp(`<div class="page"><div class="state-box"><div class="spinner"></div><p>Loading connected users…</p><small id="debug-status" style="font-size:11px;color:var(--text-light);margin-top:4px;max-width:280px;text-align:center"></small></div></div>`)
+
+  try {
+    debugLog('activityId: ' + activityId)
+    debugLog('USER.id: ' + state.USER?.id)
+    debugLog('ACTIVITY.app: ' + state.ACTIVITY?.app)
+
+    // AppUser with sharedWith returns users who have shared their insights code with
+    // the current viewer. One user may appear multiple times (once per app they share),
+    // so we deduplicate by the underlying user ID.
+    const params = {
+      sharedWith: state.USER.id,
+      limit: 100
+    }
+    // Scope to the current app if available — prevents pulling users from other apps
+    if (state.ACTIVITY?.app) params.app = state.ACTIVITY.app
+
+    debugLog('fetching AppUser: ' + JSON.stringify(params))
+    const result = await restRequest('list', 'AppUser', params)
+    debugLog('AppUser result: count=' + (result?.count ?? '?') + ' items=' + (result?.items?.length ?? '?'))
+
+    const items = result?.items || []
+
+    // Deduplicate: AppUser can return the same person multiple times across apps.
+    // Key by the user id (AppUser.user.id or AppUser.id itself).
+    const seen = new Set()
+    const unique = items.filter(item => {
+      const uid = item.user?.id || item.user?._id || item.user || item.id || item._id
+      if (!uid || uid === state.USER.id || seen.has(uid)) return false
+      seen.add(uid)
+      return true
+    })
+
+    sharedUsers = unique.map(item => {
+      // The user object may be nested under item.user, or item itself may be the user.
+      const u = (item.user && typeof item.user === 'object') ? item.user : item
+      const uid = u.id || u._id || item.id
+      return {
+        id:            uid,
+        displayName:   u.profile?.displayName || u.displayName || u.username || '',
+        username:      u.username || '',
+        email:         u.email || '',
+        questionCount: null,
+        attemptCount:  null
+      }
+    })
+
+    // For each connected user, fetch:
+    //   1. Their User record (for displayName from profile fields)
+    //   2. Their UserActivity for this activity (gives completeCount — no cross-user permission needed)
+    await Promise.all(sharedUsers.map(async (u) => {
+      try {
+        // Fetch the User record to get profile displayName
+        const userRecord = await restRequest('get', 'User', u.id)
+        const fields = userRecord?.profile?.fields || []
+        const profileDisplayName = Array.isArray(fields)
+          ? (fields.find(f => (f.name||'').toLowerCase().replace(/\s/,'') === 'displayname')?.value || '')
+          : ''
+        u.displayName = profileDisplayName || userRecord?.profile?.displayName || userRecord?.displayName || u.displayName
+        u.username    = userRecord?.username || u.username
+        u.email       = userRecord?.email    || u.email
+      } catch(e) {
+        debugLog('User fetch error for ' + u.id + ': ' + e.message)
+      }
+
+      try {
+        // UserActivity gives completeCount for a specific user+activity without needing admin
+        const ua = await restRequest('list', 'UserActivity', {
+          activity: activityId,
+          user:     u.id
+        })
+        const record = ua?.items?.[0]
+        u.attemptCount  = record?.completeCount ?? 0
+        // QuestionResponse count: use completeCount * avg as proxy isn't reliable,
+        // so fetch with user filter scoped to this activity
+        const qr = await restRequest('list', 'QuestionResponse', {
+          activity: activityId,
+          user:     u.id,
+          limit:    1
+        })
+        u.questionCount = qr?.count ?? 0
+      } catch(e) {
+        debugLog('Count fetch error for ' + u.id + ': ' + e.message)
+        u.questionCount = 0
+        u.attemptCount  = 0
+      }
+    }))
+
+  } catch (e) {
+    sharedUsers = []
+    // e.message may be the raw API error string or a stringified value
+    const msg = (e && e.message && e.message !== 'true' && e.message !== 'false')
+      ? e.message
+      : 'Could not load connected users. Check that the sharedWith parameter is supported.'
+    sharedUsersError = msg
+  }
+
+  renderUserList()
+}
+</script>
+</body>
+</html>
