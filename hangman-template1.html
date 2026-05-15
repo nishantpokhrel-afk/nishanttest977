@@ -1,0 +1,978 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Hangman</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --color-bg:           #0f1117;
+      --color-surface:      #1a1d27;
+      --color-surface-2:    #252836;
+      --color-border:       #2e3248;
+      --color-primary:      #6c63ff;
+      --color-primary-glow: rgba(108,99,255,.3);
+      --color-correct:      #22c55e;
+      --color-wrong:        #ef4444;
+      --color-text:         #e8e8f0;
+      --color-muted:        #7a7d9c;
+      --color-letter-bg:    #1e2133;
+      --radius:             12px;
+      --gallows-stroke:     #5a5d7a;
+      --body-stroke:        #ef4444;
+    }
+
+    html, body {
+      height: 100%;
+      background: var(--color-bg);
+      color: var(--color-text);
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      overflow: hidden;
+    }
+
+    /* ═══════════════════════════════════════
+       CLOSE BUTTON
+    ═══════════════════════════════════════ */
+    #close-btn {
+      position: fixed;
+      top: 16px;
+      right: 16px;
+      z-index: 999;
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      border: 1.5px solid var(--color-border);
+      background: var(--color-surface);
+      color: var(--color-muted);
+      font-size: 18px;
+      line-height: 1;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: background .15s, color .15s, border-color .15s;
+    }
+    #close-btn:hover {
+      background: rgba(239,68,68,.15);
+      border-color: var(--color-wrong);
+      color: var(--color-wrong);
+    }
+
+    /* ═══════════════════════════════════════
+       SCREENS
+    ═══════════════════════════════════════ */
+    .screen {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      overflow-y: auto;
+      padding: 76px 16px 72px;   /* generous top (clears close btn) + bottom spacing */
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity .35s ease;
+    }
+    .screen.active {
+      opacity: 1;
+      pointer-events: all;
+    }
+
+    /* ═══════════════════════════════════════
+       LOADING / ERROR
+    ═══════════════════════════════════════ */
+    #screen-loading {
+      justify-content: center;
+      gap: 14px;
+      color: var(--color-muted);
+      font-size: 14px;
+    }
+    .spinner {
+      width: 34px; height: 34px;
+      border: 3px solid var(--color-border);
+      border-top-color: var(--color-primary);
+      border-radius: 50%;
+      animation: spin .75s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    #screen-error {
+      justify-content: center;
+      gap: 14px;
+      color: var(--color-muted);
+      font-size: 14px;
+      text-align: center;
+    }
+    #error-msg { max-width: 320px; line-height: 1.5; }
+
+    /* ═══════════════════════════════════════
+       PROGRESS BAR
+    ═══════════════════════════════════════ */
+    #progress-wrap {
+      width: 100%;
+      max-width: 500px;
+      margin-bottom: 24px;
+    }
+    #progress-meta {
+      display: flex;
+      justify-content: space-between;
+      font-size: 12px;
+      color: var(--color-muted);
+      margin-bottom: 8px;
+    }
+    #progress-track {
+      width: 100%;
+      height: 7px;
+      background: var(--color-surface-2);
+      border-radius: 99px;
+      overflow: hidden;
+    }
+    #progress-fill {
+      height: 100%;
+      background: linear-gradient(90deg, var(--color-primary), #a78bfa);
+      border-radius: 99px;
+      transition: width .55s cubic-bezier(.4,0,.2,1);
+      width: 0%;
+    }
+
+    /* ═══════════════════════════════════════
+       GAME SCREEN
+    ═══════════════════════════════════════ */
+    #screen-game { gap: 0; }
+
+    #status-bar {
+      width: 100%;
+      max-width: 500px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 20px;
+    }
+    #lives-display { display: flex; gap: 5px; }
+    .heart { font-size: 17px; transition: all .3s; }
+    .heart.lost { filter: grayscale(1); opacity: .22; }
+    #score-display { font-size: 13px; font-weight: 600; color: var(--color-primary); }
+
+    #gallows-wrap { margin-bottom: 20px; }
+
+    #face-label {
+      width: 100%;
+      max-width: 500px;
+      background: var(--color-surface);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius);
+      padding: 20px 20px;
+      margin-bottom: 14px;
+    }
+    #question-label {
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: .08em;
+      color: var(--color-muted);
+      margin-bottom: 14px;
+    }
+    #word-row {
+      display: flex;
+      justify-content: center;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+    .letter-slot {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 5px;
+      min-width: 26px;
+    }
+    .slot-char {
+      font-size: 24px;
+      font-weight: 700;
+      line-height: 1;
+      min-height: 28px;
+      color: var(--color-text);
+      text-transform: uppercase;
+      transition: color .25s;
+    }
+    .slot-char.revealed-correct { color: var(--color-correct); }
+    .slot-char.revealed-wrong   { color: var(--color-wrong); }
+    .slot-line {
+      width: 100%;
+      height: 2px;
+      background: var(--color-border);
+      border-radius: 2px;
+    }
+
+    #hint-area {
+      font-size: 12px;
+      color: var(--color-muted);
+      text-align: center;
+      min-height: 18px;
+      margin-bottom: 28px;
+    }
+
+    #options-wrap { width: 100%; max-width: 500px; }
+    #options-label {
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: .08em;
+      color: var(--color-muted);
+      margin-bottom: 10px;
+    }
+    #options-grid {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      justify-content: center;
+    }
+    .opt-btn {
+      width: 42px; height: 42px;
+      border-radius: 9px;
+      border: 1.5px solid var(--color-border);
+      background: var(--color-letter-bg);
+      color: var(--color-text);
+      font-size: 15px;
+      font-weight: 600;
+      cursor: pointer;
+      text-transform: uppercase;
+      transition: all .15s;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      user-select: none;
+    }
+    .opt-btn:hover:not(:disabled) {
+      border-color: var(--color-primary);
+      background: var(--color-primary-glow);
+      transform: translateY(-2px);
+    }
+    .opt-btn:disabled { cursor: default; opacity: .22; transform: none; }
+    .opt-btn.correct-pick {
+      border-color: var(--color-correct);
+      background: rgba(34,197,94,.18);
+      color: var(--color-correct);
+      opacity: 1;
+    }
+    .opt-btn.wrong-pick {
+      border-color: var(--color-wrong);
+      background: rgba(239,68,68,.14);
+      color: var(--color-wrong);
+      opacity: 1;
+    }
+
+    /* ═══════════════════════════════════════
+       WELL DONE SCREEN
+    ═══════════════════════════════════════ */
+    #screen-welldone {
+      justify-content: center;
+      text-align: center;
+    }
+
+    .wd-emoji {
+      font-size: 76px;
+      margin-bottom: 22px;
+      animation: pop .45s cubic-bezier(.17,.67,.35,1.5) both;
+    }
+    @keyframes pop {
+      0%   { transform: scale(0); opacity: 0; }
+      100% { transform: scale(1); opacity: 1; }
+    }
+
+    .wd-title {
+      font-size: 32px;
+      font-weight: 800;
+      margin-bottom: 10px;
+      background: linear-gradient(135deg, #a78bfa, #6c63ff);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .wd-subtitle {
+      font-size: 14px;
+      color: var(--color-muted);
+      margin-bottom: 8px;
+    }
+
+    .wd-word {
+      font-size: 24px;
+      font-weight: 700;
+      letter-spacing: .14em;
+      color: var(--color-correct);
+      margin-bottom: 36px;
+    }
+
+    .wd-stats {
+      display: flex;
+      gap: 16px;
+      justify-content: center;
+      flex-wrap: wrap;
+      margin-bottom: 44px;
+    }
+
+    .wd-stat {
+      background: var(--color-surface);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius);
+      padding: 16px 24px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 5px;
+      min-width: 88px;
+    }
+    .wd-stat-num {
+      font-size: 28px;
+      font-weight: 800;
+      color: var(--color-primary);
+    }
+    .wd-stat-lbl {
+      font-size: 11px;
+      color: var(--color-muted);
+      text-transform: uppercase;
+      letter-spacing: .06em;
+    }
+
+    .primary-btn {
+      padding: 15px 44px;
+      border-radius: 12px;
+      border: none;
+      background: var(--color-primary);
+      color: #fff;
+      font-size: 16px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: opacity .15s, transform .15s;
+      letter-spacing: .02em;
+    }
+    .primary-btn:hover { opacity: .88; transform: translateY(-2px); }
+    .primary-btn:active { transform: translateY(0); }
+
+    /* ═══════════════════════════════════════
+       FINAL COMPLETION SCREEN
+    ═══════════════════════════════════════ */
+    #screen-complete {
+      justify-content: center;
+      text-align: center;
+    }
+
+    .complete-bg {
+      position: absolute;
+      inset: 0;
+      background: radial-gradient(ellipse at 50% 30%, rgba(108,99,255,.18) 0%, transparent 70%);
+      pointer-events: none;
+    }
+
+    .complete-emoji { font-size: 84px; margin-bottom: 24px; position: relative; }
+
+    .complete-title {
+      font-size: 36px;
+      font-weight: 800;
+      margin-bottom: 12px;
+      background: linear-gradient(135deg, #f9a8d4, #a78bfa, #6c63ff);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      position: relative;
+    }
+
+    .complete-sub {
+      font-size: 15px;
+      color: var(--color-muted);
+      margin-bottom: 40px;
+      position: relative;
+    }
+
+    .final-stats {
+      display: flex;
+      gap: 16px;
+      justify-content: center;
+      flex-wrap: wrap;
+      margin-bottom: 48px;
+      position: relative;
+    }
+
+    .final-stat {
+      background: var(--color-surface);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius);
+      padding: 20px 30px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 6px;
+    }
+    .final-stat-num {
+      font-size: 34px;
+      font-weight: 800;
+      color: var(--color-primary);
+    }
+    .final-stat-lbl {
+      font-size: 11px;
+      color: var(--color-muted);
+      text-transform: uppercase;
+      letter-spacing: .07em;
+    }
+
+    /* confetti */
+    .confetti-wrap {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      overflow: hidden;
+    }
+    .dot {
+      position: absolute;
+      top: -20px;
+      animation: fall linear forwards;
+    }
+    @keyframes fall {
+      0%   { transform: translateY(0) rotate(0deg); opacity: 1; }
+      100% { transform: translateY(110vh) rotate(720deg); opacity: 0; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- CLOSE BUTTON -->
+<button id="close-btn" title="Close">✕</button>
+
+<!-- LOADING -->
+<div id="screen-loading" class="screen active">
+  <div class="spinner"></div>
+  <span>Loading…</span>
+</div>
+
+<!-- ERROR -->
+<div id="screen-error" class="screen">
+  <span style="font-size:40px">⚠️</span>
+  <div id="error-msg">Something went wrong.</div>
+</div>
+
+<!-- GAME -->
+<div id="screen-game" class="screen">
+
+  <!-- Progress bar -->
+  <div id="progress-wrap">
+    <div id="progress-meta">
+      <span id="progress-label">Word 1 of 1</span>
+      <span id="progress-pct">0%</span>
+    </div>
+    <div id="progress-track">
+      <div id="progress-fill"></div>
+    </div>
+  </div>
+
+  <!-- Lives + score -->
+  <div id="status-bar">
+    <div id="lives-display"></div>
+    <div id="score-display">Score: 0</div>
+  </div>
+
+  <!-- Gallows SVG -->
+  <div id="gallows-wrap">
+    <svg viewBox="0 0 160 150" width="145" height="135" xmlns="http://www.w3.org/2000/svg">
+      <line x1="20"  y1="145" x2="140" y2="145" stroke-width="3" stroke-linecap="round" stroke="var(--gallows-stroke)"/>
+      <line x1="50"  y1="145" x2="50"  y2="10"  stroke-width="3" stroke-linecap="round" stroke="var(--gallows-stroke)"/>
+      <line x1="50"  y1="10"  x2="110" y2="10"  stroke-width="3" stroke-linecap="round" stroke="var(--gallows-stroke)"/>
+      <line x1="110" y1="10"  x2="110" y2="28"  stroke-width="3" stroke-linecap="round" stroke="var(--gallows-stroke)"/>
+      <circle id="bp-head" cx="110" cy="38" r="10" stroke="var(--body-stroke)" stroke-width="2.5" fill="none"   style="display:none"/>
+      <line   id="bp-body" x1="110" y1="48" x2="110" y2="90"  stroke="var(--body-stroke)" stroke-width="2.5" stroke-linecap="round" style="display:none"/>
+      <line   id="bp-larm" x1="110" y1="60" x2="90"  y2="78"  stroke="var(--body-stroke)" stroke-width="2.5" stroke-linecap="round" style="display:none"/>
+      <line   id="bp-rarm" x1="110" y1="60" x2="130" y2="78"  stroke="var(--body-stroke)" stroke-width="2.5" stroke-linecap="round" style="display:none"/>
+      <line   id="bp-lleg" x1="110" y1="90" x2="90"  y2="115" stroke="var(--body-stroke)" stroke-width="2.5" stroke-linecap="round" style="display:none"/>
+      <line   id="bp-rleg" x1="110" y1="90" x2="130" y2="115" stroke="var(--body-stroke)" stroke-width="2.5" stroke-linecap="round" style="display:none"/>
+    </svg>
+  </div>
+
+  <!-- Word blanks (face label) -->
+  <div id="face-label">
+    <div id="question-label">Guess the word</div>
+    <div id="word-row"></div>
+  </div>
+
+  <!-- Hint -->
+  <div id="hint-area"></div>
+
+  <!-- Letter options (multichoice) -->
+  <div id="options-wrap">
+    <div id="options-label">Pick a letter</div>
+    <div id="options-grid"></div>
+  </div>
+
+</div>
+
+<!-- WELL DONE (between pages) -->
+<div id="screen-welldone" class="screen">
+  <div class="wd-emoji" id="wd-emoji">🎉</div>
+  <div class="wd-title"    id="wd-title">Well Done!</div>
+  <div class="wd-subtitle" id="wd-subtitle">You cracked the word!</div>
+  <div class="wd-word"     id="wd-word"></div>
+  <div class="wd-stats">
+    <div class="wd-stat">
+      <div class="wd-stat-num" id="wd-score">0</div>
+      <div class="wd-stat-lbl">Score</div>
+    </div>
+    <div class="wd-stat">
+      <div class="wd-stat-num" id="wd-lives">6</div>
+      <div class="wd-stat-lbl">Lives left</div>
+    </div>
+    <div class="wd-stat">
+      <div class="wd-stat-num" id="wd-pages">1 / 1</div>
+      <div class="wd-stat-lbl">Progress</div>
+    </div>
+  </div>
+  <button class="primary-btn" id="wd-next-btn">Next Word →</button>
+</div>
+
+<!-- ACTIVITY COMPLETE (final screen) -->
+<div id="screen-complete" class="screen">
+  <div class="confetti-wrap" id="confetti-wrap"></div>
+  <div class="complete-bg"></div>
+  <div class="complete-emoji">🏆</div>
+  <div class="complete-title">Activity Complete!</div>
+  <div class="complete-sub">You've finished all the words. Amazing work!</div>
+  <div class="final-stats">
+    <div class="final-stat">
+      <div class="final-stat-num" id="final-score">0</div>
+      <div class="final-stat-lbl">Total Score</div>
+    </div>
+    <div class="final-stat">
+      <div class="final-stat-num" id="final-words">0</div>
+      <div class="final-stat-lbl">Words Solved</div>
+    </div>
+    <div class="final-stat">
+      <div class="final-stat-num" id="final-pct">0%</div>
+      <div class="final-stat-lbl">Accuracy</div>
+    </div>
+  </div>
+  <button class="primary-btn" id="finish-btn">Finish</button>
+</div>
+
+<script>
+/* ═══════════════════════════════════════════════════════════════
+   Hangman External Template — Pages Edition
+   ───────────────────────────────────────────────────────────────
+   1 Cogniss PAGE  =  1 hangman round
+   Progress bar    =  pages completed / total pages
+   Word source     =  question.text (stripped to A-Z), or question.label,
+                      or concatenated correct option letters
+   Letter buttons  =  option.text (single letter A-Z)
+   Correct option  =  letter appears in the target word
+═══════════════════════════════════════════════════════════════ */
+
+  const MAX_WRONG  = 6
+  const MAX_LIVES  = 6
+  const BODY_PARTS = ['bp-head','bp-body','bp-larm','bp-rarm','bp-lleg','bp-rleg']
+
+  // ── postMessage bridge ───────────────────────────────────────
+  const isNative = typeof window.ReactNativeWebView !== 'undefined'
+  function postToApp(key, data = null) {
+    const text = JSON.stringify({ key, data })
+    isNative ? window.ReactNativeWebView.postMessage(text)
+              : window.parent.postMessage(text, '*')
+  }
+
+  // ── global state ─────────────────────────────────────────────
+  let allQuestions   = []   // raw array from QUESTIONS
+  let pages          = []   // [{word, hint, options, questions}]
+  let pageIndex      = 0
+  let totalScore     = 0
+  let wordsSolved    = 0
+  let totalGuesses   = 0
+  let correctGuesses = 0
+  let hasQuit        = false
+
+  // per-page state
+  let targetWord     = ''
+  let guessedLetters = new Set()
+  let wrongCount     = 0
+  let letterOptions  = []   // [{_id, letter, correct, qGlobalIdx}]
+
+  // ── message bridge ───────────────────────────────────────────
+  let initDone = false
+
+  function onMessage(event) {
+    try {
+      const msg = JSON.parse(event.data)
+      if (!msg || !msg.key) return
+      handleMessage(msg)
+    } catch(_) {}
+  }
+  document.addEventListener('message', onMessage)
+  window.addEventListener('message', onMessage)
+
+  function handleMessage(msg) {
+    if (msg.key === 'QUESTIONS') {
+      let qs = msg.data
+      if (typeof qs === 'string') { try { qs = JSON.parse(qs) } catch(_) {} }
+      allQuestions = Array.isArray(qs) ? qs : []
+      tryBoot()
+    }
+    if (msg.key === 'QUESTION') tryBoot()
+  }
+
+  function tryBoot() {
+    if (initDone || !allQuestions.length) return
+    initDone = true
+    boot()
+  }
+
+  // Safety fallback: boot if QUESTION never arrives
+  setTimeout(() => {
+    if (!initDone && allQuestions.length) { initDone = true; boot() }
+  }, 3000)
+
+  // ── Close button ─────────────────────────────────────────────
+  document.getElementById('close-btn').addEventListener('click', () => {
+    if (hasQuit) return
+    hasQuit = true
+    postToApp('QUIT', { completeState: 'COMPLETE', customScore: totalScore })
+  })
+
+  postToApp('READY_DYNAMIC_MEDIA')
+
+  // ── Boot: build pages from questions ─────────────────────────
+  function boot() {
+    // Group questions by their page field (try several common field names)
+    const pageMap   = new Map()  // pageKey → [questions]
+    const pageOrder = []
+
+    allQuestions.forEach((q, idx) => {
+      const pageKey = q.page || q.pageId || q._page || q.pageID || `_solo_${idx}`
+      if (!pageMap.has(pageKey)) { pageMap.set(pageKey, []); pageOrder.push(pageKey) }
+      pageMap.get(pageKey).push({ ...q, _globalIdx: idx })
+    })
+
+    pages = pageOrder.map(key => {
+      const qs   = pageMap.get(key)
+      const word = extractWord(qs)
+      if (!word) return null
+      return {
+        word,
+        hint:      (qs[0].label || '').trim(),
+        options:   buildLetterOptions(qs, word),
+        questions: qs
+      }
+    }).filter(Boolean)
+
+    if (!pages.length) {
+      showError('No valid hangman pages found. Each page needs MULTICHOICE questions with 4–10 letter words.')
+      return
+    }
+
+    showScreen('screen-game')
+    loadPage(0)
+  }
+
+  // ── Word extraction ──────────────────────────────────────────
+  function extractWord(qs) {
+    // 1. question.text stripped to letters
+    for (const q of qs) {
+      const t = (q.text || '').replace(/[^A-Za-z]/g,'').toUpperCase()
+      if (t.length >= 4 && t.length <= 10) return t
+    }
+    // 2. question.label
+    for (const q of qs) {
+      const l = (q.label || '').replace(/[^A-Za-z]/g,'').toUpperCase()
+      if (l.length >= 4 && l.length <= 10) return l
+    }
+    // 3. concatenate correct option letters
+    const w = qs.flatMap(q => (q.options||[]).filter(o => o.correct).map(o => (o.text||'').trim().toUpperCase()))
+                .filter(l => /^[A-Z]$/.test(l)).join('')
+    if (w.length >= 4 && w.length <= 10) return w
+    return ''
+  }
+
+  // Target letter count shown to player — always show a full set
+  const TARGET_OPTION_COUNT = 18
+
+  function buildLetterOptions(qs, word) {
+    const seen = new Set()
+    const out  = []
+
+    // 1. Collect options defined in Cogniss (these carry real _ids for QUESTION_RESPONSE)
+    qs.forEach(q => {
+      (q.options || []).forEach(o => {
+        const letter = (o.text || '').trim().toUpperCase()
+        if (/^[A-Z]$/.test(letter) && !seen.has(letter)) {
+          seen.add(letter)
+          out.push({ _id: o._id, letter, correct: !!o.correct, qGlobalIdx: q._globalIdx, synthetic: false })
+        }
+      })
+    })
+
+    // 2. Pad with random filler letters up to TARGET_OPTION_COUNT
+    //    Fillers are always wrong (not in the target word) to keep gameplay fair.
+    //    If we still need more after exhausting wrong letters, allow neutral letters
+    //    (letters that happen to be in the word but already covered by a correct option).
+    const allLetters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('')
+    const wordLetters = new Set([...word])  // letters that appear in the target word
+
+    // First pass: pick letters NOT in the word at all (pure fillers)
+    const fillerPool = shuffle(allLetters.filter(l => !wordLetters.has(l) && !seen.has(l)))
+    for (const l of fillerPool) {
+      if (out.length >= TARGET_OPTION_COUNT) break
+      seen.add(l)
+      out.push({ _id: `syn_${l}`, letter: l, correct: false, qGlobalIdx: null, synthetic: true })
+    }
+
+    // Second pass: if still short, use remaining unseen letters (edge case for very long words)
+    if (out.length < TARGET_OPTION_COUNT) {
+      const remaining = shuffle(allLetters.filter(l => !seen.has(l)))
+      for (const l of remaining) {
+        if (out.length >= TARGET_OPTION_COUNT) break
+        seen.add(l)
+        out.push({ _id: `syn_${l}`, letter: l, correct: false, qGlobalIdx: null, synthetic: true })
+      }
+    }
+
+    // 3. Shuffle the full set so correct letters aren't always first
+    return shuffle(out)
+  }
+
+  function shuffle(arr) {
+    const a = [...arr]
+    for (let i = a.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [a[i], a[j]] = [a[j], a[i]]
+    }
+    return a
+  }
+
+  // ── Load a page (hangman round) ──────────────────────────────
+  function loadPage(idx) {
+    pageIndex      = idx
+    const pg       = pages[idx]
+    targetWord     = pg.word
+    guessedLetters = new Set()
+    wrongCount     = 0
+    letterOptions  = pg.options
+
+    updateProgress()
+    renderLives()
+    renderGallows()
+    renderWord()
+    renderHint(pg.hint)
+    renderOptions()
+    renderScore()
+  }
+
+  // ── Progress bar ─────────────────────────────────────────────
+  function updateProgress(override) {
+    const completed = override !== undefined ? override : pageIndex
+    const total     = pages.length
+    const pct       = Math.round((completed / total) * 100)
+    document.getElementById('progress-label').textContent = `Word ${pageIndex + 1} of ${total}`
+    document.getElementById('progress-pct').textContent   = `${pct}%`
+    document.getElementById('progress-fill').style.width  = `${pct}%`
+  }
+
+  // ── Renders ───────────────────────────────────────────────────
+  function renderLives() {
+    const rem = MAX_LIVES - wrongCount
+    const el  = document.getElementById('lives-display')
+    el.innerHTML = ''
+    for (let i = 0; i < MAX_LIVES; i++) {
+      const s = document.createElement('span')
+      s.className   = 'heart' + (i >= rem ? ' lost' : '')
+      s.textContent = '❤️'
+      el.appendChild(s)
+    }
+  }
+
+  function renderGallows() {
+    BODY_PARTS.forEach((id, i) => {
+      document.getElementById(id).style.display = i < wrongCount ? '' : 'none'
+    })
+  }
+
+  function renderWord() {
+    const row = document.getElementById('word-row')
+    row.innerHTML = ''
+    for (const ch of targetWord) {
+      const slot   = document.createElement('div')
+      slot.className = 'letter-slot'
+
+      const charEl = document.createElement('div')
+      charEl.className      = 'slot-char'
+      charEl.dataset.letter = ch
+      charEl.textContent    = guessedLetters.has(ch) ? ch : ''
+      if (guessedLetters.has(ch)) charEl.classList.add('revealed-correct')
+
+      const line   = document.createElement('div')
+      line.className = 'slot-line'
+
+      slot.appendChild(charEl)
+      slot.appendChild(line)
+      row.appendChild(slot)
+    }
+  }
+
+  function renderHint(hint) {
+    document.getElementById('hint-area').textContent = hint ? `Category: ${hint}` : ''
+  }
+
+  function renderOptions() {
+    const grid = document.getElementById('options-grid')
+    grid.innerHTML = ''
+    letterOptions.forEach(opt => {
+      const btn = document.createElement('button')
+      btn.className   = 'opt-btn'
+      btn.textContent = opt.letter
+      if (guessedLetters.has(opt.letter)) {
+        btn.classList.add(targetWord.includes(opt.letter) ? 'correct-pick' : 'wrong-pick')
+        btn.disabled = true
+      }
+      btn.addEventListener('click', () => onLetterPick(btn, opt))
+      grid.appendChild(btn)
+    })
+  }
+
+  function renderScore() {
+    document.getElementById('score-display').textContent = `Score: ${totalScore}`
+  }
+
+  // ── Letter pick ───────────────────────────────────────────────
+  function onLetterPick(btn, opt) {
+    if (btn.disabled) return
+    btn.disabled = true
+
+    const letter = opt.letter
+    guessedLetters.add(letter)
+    totalGuesses++
+
+    const inWord = targetWord.includes(letter)
+    if (inWord) {
+      btn.classList.add('correct-pick')
+      correctGuesses++
+      totalScore += 10
+      document.querySelectorAll('.slot-char').forEach(el => {
+        if (el.dataset.letter === letter) {
+          el.textContent = letter
+          el.classList.add('revealed-correct')
+        }
+      })
+    } else {
+      btn.classList.add('wrong-pick')
+      wrongCount++
+      renderGallows()
+      renderLives()
+    }
+
+    renderScore()
+
+    // Submit response to Cogniss only for real (non-synthetic) options
+    if (!opt.synthetic && opt.qGlobalIdx !== null) {
+      postToApp('QUESTION_RESPONSE', {
+        index:  opt.qGlobalIdx,
+        option: { _id: opt._id },
+        duration: 0
+      })
+    }
+
+    const allRevealed = [...targetWord].every(ch => guessedLetters.has(ch))
+
+    if (allRevealed) {
+      wordsSolved++
+      // Advance progress bar to reflect page completion
+      updateProgress(pageIndex + 1)
+      setTimeout(() => showWellDone(true), 400)
+    } else if (wrongCount >= MAX_WRONG) {
+      // Reveal full word in red
+      document.querySelectorAll('.slot-char').forEach(el => {
+        if (!guessedLetters.has(el.dataset.letter)) {
+          el.textContent = el.dataset.letter
+          el.classList.add('revealed-wrong')
+        }
+      })
+      updateProgress(pageIndex + 1)
+      setTimeout(() => showWellDone(false), 650)
+    }
+  }
+
+  // ── Well Done screen ──────────────────────────────────────────
+  function showWellDone(won) {
+    const isLast = pageIndex >= pages.length - 1
+
+    document.getElementById('wd-emoji').textContent    = won ? '🎉' : '💀'
+    document.getElementById('wd-title').textContent    = won ? 'Well Done!' : 'Oops!'
+    document.getElementById('wd-subtitle').textContent = won ? 'You cracked the word!' : 'The word was'
+    document.getElementById('wd-word').textContent     = targetWord
+    document.getElementById('wd-score').textContent    = totalScore
+    document.getElementById('wd-lives').textContent    = MAX_LIVES - wrongCount
+    document.getElementById('wd-pages').textContent    = `${pageIndex + 1} / ${pages.length}`
+    document.getElementById('wd-next-btn').textContent = isLast ? '🏆 See Results' : 'Next Word →'
+
+    showScreen('screen-welldone')
+  }
+
+  document.getElementById('wd-next-btn').addEventListener('click', () => {
+    const next = pageIndex + 1
+    if (next < pages.length) {
+      showScreen('screen-game')
+      loadPage(next)
+    } else {
+      showComplete()
+    }
+  })
+
+  // ── Complete screen ───────────────────────────────────────────
+  function showComplete() {
+    const accuracy = totalGuesses
+      ? Math.round((correctGuesses / totalGuesses) * 100)
+      : 0
+
+    document.getElementById('final-score').textContent = totalScore
+    document.getElementById('final-words').textContent = `${wordsSolved}/${pages.length}`
+    document.getElementById('final-pct').textContent   = `${accuracy}%`
+
+    showScreen('screen-complete')
+    spawnConfetti()
+  }
+
+  document.getElementById('finish-btn').addEventListener('click', quit)
+
+  // ── Quit ──────────────────────────────────────────────────────
+  function quit() {
+    if (hasQuit) return
+    hasQuit = true
+    postToApp('QUIT', { completeState: 'COMPLETE', customScore: totalScore })
+  }
+
+  // ── Screen switcher ───────────────────────────────────────────
+  function showScreen(id) {
+    document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'))
+    document.getElementById(id).classList.add('active')
+  }
+
+  // ── Error ─────────────────────────────────────────────────────
+  function showError(msg) {
+    document.getElementById('error-msg').textContent = msg
+    showScreen('screen-error')
+    postToApp('ERROR', { message: msg })
+  }
+
+  // ── Confetti ──────────────────────────────────────────────────
+  function spawnConfetti() {
+    const wrap   = document.getElementById('confetti-wrap')
+    wrap.innerHTML = ''
+    const colors = ['#6c63ff','#a78bfa','#f9a8d4','#22c55e','#fbbf24','#60a5fa','#f87171']
+    for (let i = 0; i < 60; i++) {
+      const dot = document.createElement('div')
+      dot.className = 'dot'
+      const size = 6 + Math.random() * 7
+      dot.style.cssText = `
+        left: ${Math.random() * 100}%;
+        background: ${colors[Math.floor(Math.random() * colors.length)]};
+        animation-duration: ${1.8 + Math.random() * 2.4}s;
+        animation-delay: ${Math.random() * 1.3}s;
+        width: ${size}px;
+        height: ${size}px;
+        border-radius: ${Math.random() > .45 ? '50%' : '2px'};
+      `
+      wrap.appendChild(dot)
+    }
+  }
+</script>
+</body>
+</html>
