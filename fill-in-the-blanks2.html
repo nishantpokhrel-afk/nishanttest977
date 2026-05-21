@@ -1,0 +1,749 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>Fill in the Blanks</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --color-primary: #4a6cf7;
+      --color-primary-dark: #3a5ce4;
+      --color-dark: #1a1a2e;
+      --color-light: #f8f9ff;
+      --color-background: #ffffff;
+      --color-success: #28a745;
+      --color-danger: #dc3545;
+      --color-warning: #e6a817;
+      --color-text: #333333;
+      --color-text-muted: #888888;
+      --border-radius: 12px;
+    }
+
+    html, body {
+      height: 100%; width: 100%; overflow: hidden;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+      background: var(--color-background);
+      color: var(--color-text);
+    }
+
+    /* ── LOADING ── */
+    #loading-screen {
+      position: fixed; inset: 0; z-index: 999;
+      display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 16px;
+      background: var(--color-background);
+    }
+    .spinner {
+      width: 40px; height: 40px; border-radius: 50%;
+      border: 3px solid rgba(0,0,0,0.1); border-top-color: var(--color-primary);
+      animation: spin 0.8s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    #loading-screen p { font-size: 14px; color: var(--color-text-muted); }
+
+    /* ── SHELL ── */
+    #app { display: none; flex-direction: column; height: 100%; width: 100%; position: relative; }
+    #app.visible { display: flex; }
+
+    /* ── HEADER ── */
+    #header { flex-shrink: 0; background: var(--color-primary); padding-top: 100px; }
+    #header-inner {
+      display: flex; align-items: center; gap: 12px;
+      padding: 12px 16px 0; min-height: 56px;
+    }
+    .header-spacer { width: 36px; flex-shrink: 0; }
+    #activity-title {
+      flex: 1; text-align: center;
+      font-size: 17px; font-weight: 700; color: #fff;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    #close-btn {
+      width: 36px; height: 36px; flex-shrink: 0;
+      border-radius: 50%; border: none; cursor: pointer;
+      background: rgba(255,255,255,0.2);
+      display: flex; align-items: center; justify-content: center;
+    }
+    #close-btn:active { background: rgba(255,255,255,0.35); }
+    #close-btn svg { width: 18px; height: 18px; stroke: #fff; fill: none; stroke-width: 2.5; stroke-linecap: round; }
+    #progress-bar-wrap { padding: 10px 16px 14px; }
+    #progress-track { height: 6px; background: rgba(255,255,255,0.3); border-radius: 3px; overflow: hidden; }
+    #progress-fill { height: 100%; background: #fff; border-radius: 3px; width: 0%; transition: width 0.4s ease; }
+
+    /* ── CONTENT ── */
+    #content-area {
+      flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      padding: 24px 20px 16px;
+    }
+    #question-card {
+      width: 100%; max-width: 460px;
+      display: flex; flex-direction: column; align-items: center; gap: 20px;
+    }
+
+    /* ── IMAGE ── */
+    #question-image-wrap {
+      width: 100%; border-radius: var(--border-radius);
+      overflow: hidden; display: none;
+    }
+    #question-image-wrap.visible { display: block; }
+    #question-image { width: 100%; height: 180px; object-fit: cover; display: block; }
+
+    /* ── TEXT STEPS ── */
+    /* All three lines are always visible at once, shown as a simple stack */
+    #text-block {
+      width: 100%; display: none; flex-direction: column; gap: 12px;
+      animation: fadeUp 0.3s ease;
+    }
+    #text-block.visible { display: flex; }
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(8px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    .text-row {
+      display: flex; gap: 8px; align-items: baseline;
+    }
+    .text-label {
+      font-size: 13px; font-weight: 700; color: var(--color-text-muted);
+      text-transform: uppercase; letter-spacing: 0.04em;
+      white-space: nowrap; flex-shrink: 0; min-width: 80px;
+    }
+    .text-value {
+      font-size: 16px; line-height: 1.55; color: var(--color-text);
+    }
+    .text-value .blank-word {
+      font-weight: 700; color: var(--color-primary);
+    }
+
+    /* Divider between text block and fill area */
+    .divider {
+      width: 100%; height: 1px; background: #e8eaf0;
+    }
+
+    /* ── FILL AREA ── */
+    #fill-area {
+      display: none; width: 100%;
+      flex-direction: column; align-items: center; gap: 16px;
+      animation: fadeUp 0.3s ease;
+    }
+    #fill-area.visible { display: flex; }
+
+    /* The word display — blank slots shown as underscored tiles */
+    #word-display {
+      display: flex; flex-wrap: wrap; justify-content: center; gap: 6px;
+      padding: 4px 0;
+    }
+    .placed-tile {
+      width: 40px; height: 46px;
+      display: flex; align-items: center; justify-content: center;
+      background: var(--color-primary); color: #fff;
+      font-size: 20px; font-weight: 700; border-radius: 8px;
+      cursor: pointer; user-select: none;
+      box-shadow: 0 3px 0 var(--color-primary-dark);
+      animation: popIn 0.15s ease;
+      transition: transform 0.1s, box-shadow 0.1s;
+    }
+    .placed-tile:active { transform: translateY(2px); box-shadow: 0 1px 0 var(--color-primary-dark); }
+    @keyframes popIn {
+      from { transform: scale(0.7); opacity: 0; }
+      to   { transform: scale(1);   opacity: 1; }
+    }
+    .slot-empty {
+      width: 40px; height: 46px;
+      border-bottom: 3px solid #c0c8e8;
+      border-radius: 2px;
+    }
+
+    /* shake on wrong */
+    #word-display.wrong-flash { animation: shake 0.32s ease; }
+    #word-display.correct-flash .placed-tile { background: var(--color-success); box-shadow: 0 3px 0 #1e7e34; }
+    @keyframes shake {
+      0%,100% { transform: translateX(0); }
+      25%     { transform: translateX(-8px); }
+      75%     { transform: translateX(8px); }
+    }
+
+    /* Feedback */
+    #feedback-msg {
+      font-size: 14px; font-weight: 600; min-height: 20px; text-align: center;
+    }
+    #feedback-msg.success { color: var(--color-success); }
+    #feedback-msg.error   { color: var(--color-danger); }
+
+    /* ── HINT ── */
+    #hint-area { display: flex; flex-direction: column; align-items: center; gap: 8px; }
+    #hint-btn {
+      padding: 7px 18px; font-size: 13px; font-weight: 600;
+      border-radius: 20px; border: 2px solid var(--color-warning);
+      background: transparent; color: var(--color-warning);
+      cursor: pointer; display: flex; align-items: center; gap: 5px;
+      transition: opacity 0.2s, background 0.15s, color 0.15s;
+    }
+    #hint-btn.state-hidden   { visibility: hidden; pointer-events: none; }
+    #hint-btn.state-inactive { opacity: 0.35; pointer-events: none; }
+    #hint-btn.state-active   { opacity: 1; pointer-events: auto; }
+    #hint-btn:active { background: var(--color-warning); color: #fff; }
+    #hint-text { font-size: 13px; color: var(--color-warning); font-weight: 600; display: none; }
+    #hint-text.visible { display: block; animation: fadeUp 0.2s ease; }
+
+    /* ── LETTER POOL ── */
+    #letter-pool {
+      display: flex; flex-wrap: wrap; justify-content: center; gap: 8px;
+      width: 100%; padding: 4px 0 4px;
+    }
+    .pool-tile {
+      width: 44px; height: 50px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 20px; font-weight: 700; border-radius: 8px;
+      cursor: pointer; user-select: none;
+      background: #fff; color: var(--color-dark);
+      border: 2px solid #dde2f5;
+      box-shadow: 0 3px 0 #c4cae8;
+      transition: transform 0.1s, box-shadow 0.1s, opacity 0.15s;
+    }
+    .pool-tile:active { transform: translateY(2px); box-shadow: 0 1px 0 #c4cae8; }
+    .pool-tile.used { opacity: 0; pointer-events: none; }
+
+    /* ── BOTTOM BAR ── */
+    #action-bar {
+      flex-shrink: 0; background: var(--color-background);
+      border-top: 1px solid rgba(0,0,0,0.07);
+      padding: 12px 20px max(12px, env(safe-area-inset-bottom));
+    }
+    #action-btn {
+      width: 100%; padding: 15px;
+      font-size: 16px; font-weight: 700; border: none;
+      border-radius: var(--border-radius);
+      background: var(--color-primary); color: #fff;
+      cursor: pointer; transition: background 0.15s, transform 0.1s;
+    }
+    #action-btn:active { background: var(--color-primary-dark); transform: scale(0.98); }
+    #action-btn:disabled { opacity: 0.45; pointer-events: none; }
+
+    /* ── COMPLETION ── */
+    #completion-screen {
+      display: none; position: absolute; inset: 0; z-index: 10;
+      flex-direction: column; align-items: center; justify-content: center;
+      background: var(--color-background); gap: 20px; padding: 32px 24px; text-align: center;
+    }
+    #completion-screen.visible { display: flex; }
+    .completion-icon {
+      width: 80px; height: 80px; border-radius: 50%;
+      background: linear-gradient(135deg, var(--color-primary), var(--color-primary-dark));
+      display: flex; align-items: center; justify-content: center;
+    }
+    .completion-icon svg { width: 40px; height: 40px; stroke: #fff; fill: none; stroke-width: 2.5; stroke-linecap: round; stroke-linejoin: round; }
+    #completion-screen h2 { font-size: 24px; font-weight: 700; color: var(--color-dark); }
+    #completion-screen p  { font-size: 15px; color: var(--color-text-muted); line-height: 1.5; }
+    #score-display { font-size: 44px; font-weight: 800; color: var(--color-primary); }
+    #finish-btn {
+      padding: 15px 40px; font-size: 16px; font-weight: 700;
+      border: none; border-radius: var(--border-radius);
+      background: var(--color-primary); color: #fff; cursor: pointer;
+    }
+    #finish-btn:active { background: var(--color-primary-dark); }
+  </style>
+</head>
+<body>
+
+<div id="loading-screen">
+  <div class="spinner"></div>
+  <p>Loading activity…</p>
+</div>
+
+<div id="app">
+  <div id="header">
+    <div id="header-inner">
+      <div class="header-spacer"></div>
+      <span id="activity-title">Fill in the Blanks</span>
+      <button id="close-btn" aria-label="Close">
+        <svg viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+    <div id="progress-bar-wrap">
+      <div id="progress-track"><div id="progress-fill"></div></div>
+    </div>
+  </div>
+
+  <div id="content-area">
+    <div id="question-card">
+
+      <!-- Image -->
+      <div id="question-image-wrap">
+        <img id="question-image" src="" alt="" />
+      </div>
+
+      <!-- Three text lines, always shown together once fill step begins -->
+      <!-- During steps 1/2/3 we show progressively; at 'fill' all three are visible -->
+      <div id="text-block">
+        <div class="text-row" id="row-1">
+          <span class="text-label">First text:</span>
+          <span class="text-value" id="val-1"></span>
+        </div>
+        <div class="text-row" id="row-2" style="display:none">
+          <span class="text-label">Second text:</span>
+          <span class="text-value" id="val-2"></span>
+        </div>
+        <div class="text-row" id="row-3" style="display:none">
+          <span class="text-label">Third text:</span>
+          <span class="text-value" id="val-3"></span>
+        </div>
+      </div>
+
+      <div class="divider" id="divider" style="display:none"></div>
+
+      <!-- Fill interaction -->
+      <div id="fill-area">
+        <div id="word-display"></div>
+        <div id="feedback-msg"></div>
+        <div id="hint-area">
+          <button id="hint-btn" class="state-hidden">💡 Hint</button>
+          <div id="hint-text"></div>
+        </div>
+        <div id="letter-pool"></div>
+      </div>
+
+    </div>
+  </div>
+
+  <div id="action-bar">
+    <button id="action-btn">Next</button>
+  </div>
+
+  <div id="completion-screen">
+    <div class="completion-icon">
+      <svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
+    </div>
+    <h2>Well done!</h2>
+    <p>You've completed all questions.</p>
+    <div id="score-display"></div>
+    <button id="finish-btn">Finish</button>
+  </div>
+</div>
+
+<script>
+// ═══════════════════════════════════
+// Bridge
+// ═══════════════════════════════════
+const isNative = typeof window.ReactNativeWebView !== 'undefined'
+
+function postToApp(key, data = null) {
+  const msg = JSON.stringify({ key, data })
+  if (isNative) window.ReactNativeWebView.postMessage(msg)
+  else window.parent.postMessage(msg, '*')
+}
+
+let _reqId = 0
+const _pending = {}
+function restRequest(method, model, data, specialParams) {
+  return new Promise((resolve, reject) => {
+    const id = 'req-' + (++_reqId)
+    _pending[id] = { resolve, reject }
+    const msg = JSON.stringify({ key: 'REST_REQUEST', method, model, data, id, specialParams: specialParams || null })
+    if (isNative) window.ReactNativeWebView.postMessage(msg)
+    else window.parent.postMessage(msg, '*')
+  })
+}
+
+function onMessage(event) {
+  try { const m = JSON.parse(event.data); if (m && m.key) handleMessage(m) } catch(e) {}
+}
+document.addEventListener('message', onMessage)
+window.addEventListener('message', onMessage)
+
+// ═══════════════════════════════════
+// App state
+// ═══════════════════════════════════
+const appState = {}
+const REQUIRED = ['API', 'USER', 'AUTH', 'ACTIVITY', 'ACTIVITY_RESPONSE', 'QUESTIONS', 'CONFIG']
+let initialized = false
+
+let questions     = []
+let qIndex        = 0
+let totalScore    = 0
+let hasQuit       = false
+
+// Per-question
+let currentStep       = 1   // 1, 2, 3, 'fill'
+let currentQ          = null
+let correctAnswer     = ''
+let poolLetters       = []
+let placedTiles       = []
+let incorrectAttempts = 0
+let answered          = false
+
+function handleMessage(m) {
+  if (m.key === 'REQUEST_RESPONSE') {
+    const p = _pending[m.id]
+    if (p) { delete _pending[m.id]; m.error ? p.reject(new Error(m.error)) : p.resolve(m.data) }
+    return
+  }
+  appState[m.key] = m.data
+  if (!initialized && REQUIRED.every(k => appState[k] !== undefined)) {
+    initialized = true
+    startTemplate()
+  }
+}
+
+// ═══════════════════════════════════
+// Theme
+// ═══════════════════════════════════
+async function applyTheme() {
+  try {
+    const [appRaw, settRaw] = await Promise.all([
+      restRequest('get', 'App', appState.ACTIVITY_RESPONSE.app).catch(() => ({})),
+      restRequest('list', 'Settings', {}).catch(() => ({ items: [] }))
+    ])
+    const at = appRaw.theme || {}
+    const pt = (settRaw.items && settRaw.items[0]?.theme) || {}
+    const c  = Object.assign({}, pt.colors, at.colors)
+    const r  = document.documentElement
+    if (c.primary) {
+      r.style.setProperty('--color-primary', c.primary)
+      r.style.setProperty('--color-primary-dark', darken(c.primary, 15))
+    }
+    if (c.dark)  r.style.setProperty('--color-dark', c.dark)
+    if (c.light) r.style.setProperty('--color-light', c.light)
+    const bg = at.generalBackground?.color || pt.generalBackground?.color
+    if (bg) r.style.setProperty('--color-background', bg)
+    const rm = { NONE:'0px', SMALL:'4px', MEDIUM:'8px', LARGE:'16px', FULL:'9999px' }
+    const rd = at.rounded || pt.rounded
+    if (rd && rm[rd]) r.style.setProperty('--border-radius', rm[rd])
+  } catch(e) {}
+}
+function darken(hex, amt) {
+  hex = hex.replace('#','')
+  if (hex.length === 3) hex = hex.split('').map(c=>c+c).join('')
+  const [r,g,b] = [0,2,4].map(i => Math.max(0, parseInt(hex.slice(i,i+2),16) - amt))
+  return '#' + [r,g,b].map(v=>v.toString(16).padStart(2,'0')).join('')
+}
+
+// ═══════════════════════════════════
+// Start
+// ═══════════════════════════════════
+async function startTemplate() {
+  await applyTheme()
+  const allQ = Array.isArray(appState.QUESTIONS) ? appState.QUESTIONS : []
+  questions  = allQ.filter(q => q.type === 'MULTICHOICE')
+  if (!questions.length) { postToApp('ERROR', { message: 'No MULTICHOICE questions found.' }); return }
+  document.getElementById('loading-screen').style.display = 'none'
+  document.getElementById('app').classList.add('visible')
+  loadQuestion(0)
+}
+
+// ═══════════════════════════════════
+// Load a question block
+// ═══════════════════════════════════
+async function loadQuestion(index) {
+  qIndex            = index
+  currentQ          = questions[index]
+  currentStep       = 1
+  incorrectAttempts = 0
+  answered          = false
+  poolLetters       = []
+  placedTiles       = []
+
+  updateProgress()
+  resetUI()
+
+  // ── Title: use the data label of THIS content block ──
+  document.getElementById('activity-title').textContent =
+    currentQ.label || currentQ.text || 'Fill in the Blanks'
+
+  // ── Parse three text lines from question.text (newline-separated) ──
+  // question.text holds all three lines as:
+  //   Line 1\nLine 2\nLine 3
+  // Each line may contain [WORD] to indicate the blank.
+  const rawText = currentQ.text || ''
+  const lines   = rawText.split('\n').map(l => l.trim()).filter(l => l.length > 0)
+  const line1   = lines[0] || ''
+  const line2   = lines[1] || ''
+  const line3   = lines[2] || ''
+
+  // ── Correct answer: concatenate all option texts ──
+  const opts    = (currentQ.options || []).filter(o => o.text)
+  correctAnswer = opts.map(o => o.text.trim().replace(/[^A-Za-z0-9]/g, '')).join('').toUpperCase()
+
+  // ── Blank display: underscores matching answer length ──
+  const blankDisplay = correctAnswer ? correctAnswer.replace(/./g, '_ ').trimEnd() : '_ _ _'
+
+  // Render a line, replacing [ANYTHING] with the blank display
+  function renderLine(raw) {
+    if (!raw) return ''
+    return raw.replace(/\[[^\]]*\]/, `<span class="blank-word">${blankDisplay}</span>`)
+  }
+
+  document.getElementById('val-1').innerHTML = renderLine(line1) || '&nbsp;'
+  document.getElementById('val-2').innerHTML = renderLine(line2) || '&nbsp;'
+  document.getElementById('val-3').innerHTML = renderLine(line3) || '&nbsp;'
+
+  // ── Build letter pool ──
+  buildLetterPool(correctAnswer)
+
+  await loadQuestionImage(currentQ)
+  showStep(1)
+}
+
+// ═══════════════════════════════════
+// Step display
+// ═══════════════════════════════════
+function showStep(step) {
+  currentStep = step
+  const actionBtn = document.getElementById('action-btn')
+  const textBlock = document.getElementById('text-block')
+  const fillArea  = document.getElementById('fill-area')
+  const divider   = document.getElementById('divider')
+
+  // Always show text block
+  textBlock.classList.add('visible')
+
+  // Show rows progressively
+  document.getElementById('row-1').style.display = 'flex'
+  document.getElementById('row-2').style.display = (step >= 2 || step === 'fill') ? 'flex' : 'none'
+  document.getElementById('row-3').style.display = (step >= 3 || step === 'fill') ? 'flex' : 'none'
+
+  if (step === 'fill') {
+    divider.style.display = 'block'
+    fillArea.classList.add('visible')
+    renderPool()
+    renderSlots()
+    actionBtn.textContent = 'Submit'
+    actionBtn.disabled    = true
+  } else {
+    divider.style.display = 'none'
+    fillArea.classList.remove('visible')
+    actionBtn.textContent = 'Next'
+    actionBtn.disabled    = false
+  }
+}
+
+function advanceStep() {
+  if      (currentStep === 1) showStep(2)
+  else if (currentStep === 2) showStep(3)
+  else if (currentStep === 3) correctAnswer ? showStep('fill') : goNextQuestion()
+}
+
+// ═══════════════════════════════════
+// Letter pool
+// ═══════════════════════════════════
+const ALPHA = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'
+
+function buildLetterPool(answer) {
+  const letters     = answer.split('')
+  const targetCount = Math.max(6, letters.length + 2)
+  const padCount    = targetCount - letters.length
+  const padding     = Array.from({ length: padCount }, () => ALPHA[Math.floor(Math.random() * 26)])
+  const all         = [...letters, ...padding]
+  // Fisher-Yates shuffle
+  for (let i = all.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [all[i], all[j]] = [all[j], all[i]]
+  }
+  poolLetters = all.map((letter, i) => ({ letter, id: 'p' + i, used: false }))
+}
+
+function renderPool() {
+  const pool = document.getElementById('letter-pool')
+  pool.innerHTML = ''
+  poolLetters.forEach(item => {
+    const t = document.createElement('div')
+    t.className   = 'pool-tile' + (item.used ? ' used' : '')
+    t.textContent = item.letter
+    t.dataset.id  = item.id
+    t.addEventListener('click', () => onPoolTap(item.id))
+    pool.appendChild(t)
+  })
+}
+
+function renderSlots() {
+  const wd  = document.getElementById('word-display')
+  wd.innerHTML = ''
+  const len = correctAnswer.length
+  for (let i = 0; i < len; i++) {
+    if (i < placedTiles.length) {
+      const pid  = placedTiles[i]
+      const item = poolLetters.find(p => p.id === pid)
+      const t    = document.createElement('div')
+      t.className   = 'placed-tile'
+      t.textContent = item ? item.letter : ''
+      t.dataset.pos = i
+      t.addEventListener('click', () => onPlacedTap(i))
+      wd.appendChild(t)
+    } else {
+      const s = document.createElement('div')
+      s.className = 'slot-empty'
+      wd.appendChild(s)
+    }
+  }
+  // Enable submit only when all slots filled
+  const btn = document.getElementById('action-btn')
+  if (currentStep === 'fill' && !answered) {
+    btn.disabled = placedTiles.length !== len
+  }
+}
+
+function onPoolTap(id) {
+  if (answered) return
+  const item = poolLetters.find(p => p.id === id)
+  if (!item || item.used || placedTiles.length >= correctAnswer.length) return
+  item.used = true
+  placedTiles.push(id)
+  renderSlots()
+  renderPool()
+}
+
+function onPlacedTap(pos) {
+  if (answered) return
+  const item = poolLetters.find(p => p.id === placedTiles[pos])
+  if (item) item.used = false
+  placedTiles.splice(pos, 1)
+  renderSlots()
+  renderPool()
+}
+
+// ═══════════════════════════════════
+// Submit
+// ═══════════════════════════════════
+function submitAnswer() {
+  if (answered || placedTiles.length !== correctAnswer.length) return
+  const userAns = placedTiles.map(id => poolLetters.find(p => p.id === id)?.letter || '').join('').toUpperCase()
+  const wd      = document.getElementById('word-display')
+
+  if (userAns === correctAnswer) {
+    answered = true
+    wd.classList.add('correct-flash')
+    showFeedback('Correct! 🎉', 'success')
+    totalScore++
+    document.getElementById('action-btn').textContent = 'Next'
+    document.getElementById('action-btn').disabled    = false
+    document.querySelectorAll('.pool-tile').forEach(t => t.style.pointerEvents = 'none')
+
+    const correctOpt = (currentQ.options || []).find(o => o.correct) || (currentQ.options || [])[0]
+    if (correctOpt) postToApp('QUESTION_RESPONSE', { index: qIndex, option: { _id: correctOpt._id }, duration: 0 })
+  } else {
+    incorrectAttempts++
+    wd.classList.add('wrong-flash')
+    setTimeout(() => wd.classList.remove('wrong-flash'), 380)
+    showFeedback('Not quite — try again!', 'error')
+    placedTiles.forEach(id => { const it = poolLetters.find(p => p.id === id); if (it) it.used = false })
+    placedTiles = []
+    renderSlots()
+    renderPool()
+    updateHintState()
+  }
+}
+
+// ═══════════════════════════════════
+// Hint
+// ═══════════════════════════════════
+function updateHintState() {
+  const btn = document.getElementById('hint-btn')
+  if      (incorrectAttempts === 0) btn.className = 'state-hidden'
+  else if (incorrectAttempts === 1) btn.className = 'state-inactive'
+  else                              btn.className = 'state-active'
+}
+
+document.getElementById('hint-btn').addEventListener('click', function() {
+  if (incorrectAttempts < 2) return
+  document.getElementById('hint-text').textContent = 'Answer: ' + correctAnswer
+  document.getElementById('hint-text').classList.add('visible')
+  this.style.display = 'none'
+})
+
+// ═══════════════════════════════════
+// Feedback
+// ═══════════════════════════════════
+function showFeedback(msg, type) {
+  const el = document.getElementById('feedback-msg')
+  el.textContent = msg; el.className = type
+}
+function clearFeedback() {
+  const el = document.getElementById('feedback-msg')
+  el.textContent = ''; el.className = ''
+}
+
+// ═══════════════════════════════════
+// Image
+// ═══════════════════════════════════
+async function loadQuestionImage(q) {
+  const wrap = document.getElementById('question-image-wrap')
+  const img  = document.getElementById('question-image')
+  if (!q.image) { wrap.classList.remove('visible'); return }
+  try {
+    const file = await restRequest('get', 'File', q.image)
+    if (file?.url) { img.src = file.url; wrap.classList.add('visible') }
+    else wrap.classList.remove('visible')
+  } catch { wrap.classList.remove('visible') }
+}
+
+// ═══════════════════════════════════
+// Navigation
+// ═══════════════════════════════════
+function goNextQuestion() {
+  const next = qIndex + 1
+  if (next < questions.length) loadQuestion(next)
+  else showCompletion()
+}
+
+function updateProgress() {
+  const pct = questions.length > 1 ? (qIndex / (questions.length - 1)) * 100 : 0
+  document.getElementById('progress-fill').style.width = pct + '%'
+}
+
+function resetUI() {
+  clearFeedback()
+  document.getElementById('word-display').classList.remove('correct-flash', 'wrong-flash')
+  document.getElementById('word-display').innerHTML = ''
+  document.getElementById('letter-pool').innerHTML  = ''
+  document.getElementById('hint-btn').className     = 'state-hidden'
+  document.getElementById('hint-btn').style.display = ''
+  document.getElementById('hint-text').classList.remove('visible')
+  document.getElementById('hint-text').textContent  = ''
+  document.getElementById('text-block').classList.remove('visible')
+  document.getElementById('fill-area').classList.remove('visible')
+  document.getElementById('divider').style.display  = 'none'
+  // Reset row visibility
+  document.getElementById('row-2').style.display = 'none'
+  document.getElementById('row-3').style.display = 'none'
+}
+
+function showCompletion() {
+  document.getElementById('progress-fill').style.width = '100%'
+  document.getElementById('completion-screen').classList.add('visible')
+  const pct = questions.length > 0 ? Math.round((totalScore / questions.length) * 100) : 0
+  document.getElementById('score-display').textContent = pct + '%'
+  document.querySelector('#completion-screen h2').textContent =
+    pct === 100 ? 'Perfect Score! 🌟' : pct >= 60 ? 'Well done!' : 'Activity Complete'
+  document.querySelector('#completion-screen p').textContent =
+    `You got ${totalScore} out of ${questions.length} correct.`
+}
+
+document.getElementById('finish-btn').addEventListener('click', function() {
+  if (hasQuit) return
+  hasQuit = true
+  const pct = questions.length > 0 ? Math.round((totalScore / questions.length) * 100) : 0
+  postToApp('QUIT', { completeState: pct >= 60 ? 'PASS' : 'COMPLETE', customScore: pct })
+})
+
+// ═══════════════════════════════════
+// Action button
+// ═══════════════════════════════════
+document.getElementById('action-btn').addEventListener('click', function() {
+  if (currentStep === 'fill') {
+    if (answered) goNextQuestion()
+    else submitAnswer()
+  } else {
+    advanceStep()
+  }
+})
+
+document.getElementById('close-btn').addEventListener('click', function() {
+  if (hasQuit) return; hasQuit = true
+  postToApp('QUIT', { completeState: 'COMPLETE' })
+})
+
+window.addEventListener('load', () => postToApp('READY_DYNAMIC_MEDIA'))
+</script>
+</body>
+</html>
