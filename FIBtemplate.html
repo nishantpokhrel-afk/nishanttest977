@@ -1,0 +1,773 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>Fill in the Blanks</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --color-primary: #4a6cf7;
+      --color-primary-dark: #3a5ce4;
+      --color-secondary: #6c757d;
+      --color-dark: #1a1a2e;
+      --color-light: #f8f9ff;
+      --color-background: #ffffff;
+      --color-success: #28a745;
+      --color-danger: #dc3545;
+      --color-warning: #e6a817;
+      --color-text: #333333;
+      --color-text-muted: #888888;
+      --border-radius: 12px;
+    }
+
+    html, body {
+      height: 100%; width: 100%;
+      overflow: hidden;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+      background: var(--color-background);
+      color: var(--color-text);
+    }
+
+    /* ── LOADING ── */
+    #loading-screen {
+      position: fixed; inset: 0;
+      display: flex; align-items: center; justify-content: center;
+      flex-direction: column; gap: 16px;
+      background: var(--color-background); z-index: 999;
+    }
+    .spinner {
+      width: 40px; height: 40px;
+      border: 3px solid rgba(0,0,0,0.1);
+      border-top-color: var(--color-primary);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    #loading-screen p { color: var(--color-text-muted); font-size: 14px; }
+
+    /* ── SHELL ── */
+    #app { display: none; flex-direction: column; height: 100%; width: 100%; }
+    #app.visible { display: flex; }
+
+    /* ── HEADER ── */
+    #header {
+      flex-shrink: 0;
+      background: var(--color-primary);
+      padding-top: 100px;
+    }
+    #header-inner {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 12px 16px 0; gap: 12px; min-height: 56px;
+    }
+    #activity-title {
+      flex: 1; font-size: 17px; font-weight: 700; color: #fff;
+      text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    #close-btn {
+      width: 36px; height: 36px; border-radius: 50%;
+      background: rgba(255,255,255,0.2); border: none; cursor: pointer;
+      display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+    }
+    #close-btn:active { background: rgba(255,255,255,0.35); }
+    #close-btn svg { width: 18px; height: 18px; stroke: #fff; fill: none; stroke-width: 2.5; stroke-linecap: round; }
+    .header-spacer { width: 36px; flex-shrink: 0; }
+    #progress-bar-wrap { padding: 10px 16px 14px; }
+    #progress-track { height: 6px; background: rgba(255,255,255,0.3); border-radius: 3px; overflow: hidden; }
+    #progress-fill { height: 100%; background: #fff; border-radius: 3px; transition: width 0.4s ease; width: 0%; }
+
+    /* ── CONTENT ── */
+    #content-area {
+      flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      padding: 20px 20px 12px;
+    }
+    #question-card {
+      width: 100%; max-width: 480px;
+      display: flex; flex-direction: column; align-items: center; gap: 18px;
+    }
+
+    /* ── IMAGE ── */
+    #question-image-wrap {
+      width: 100%; border-radius: var(--border-radius);
+      overflow: hidden; background: #f0f0f0; display: none;
+    }
+    #question-image-wrap.visible { display: block; }
+    #question-image { width: 100%; height: 180px; object-fit: cover; display: block; }
+
+    /* ── TEXT STEPS ── */
+    #text-step-wrap { width: 100%; text-align: center; }
+    .text-step { display: none; animation: fadeUp 0.3s ease; }
+    .text-step.active { display: block; }
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(8px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    .text-step p { font-size: 16px; line-height: 1.65; color: var(--color-text); }
+    .blank-word { font-weight: 700; color: var(--color-primary); }
+
+    /* ── FILL AREA ── */
+    #fill-area {
+      display: none; width: 100%;
+      flex-direction: column; align-items: center; gap: 14px;
+      animation: fadeUp 0.3s ease;
+    }
+    #fill-area.visible { display: flex; }
+
+    /* Answer slots row — shows the word being built */
+    #answer-slots {
+      display: flex; flex-wrap: wrap; justify-content: center; gap: 6px;
+      min-height: 52px; padding: 8px 12px;
+      background: var(--color-light); border-radius: var(--border-radius);
+      width: 100%;
+      border: 2px solid transparent;
+      transition: border-color 0.25s, background 0.25s;
+    }
+    #answer-slots.correct-flash { border-color: var(--color-success); background: #f0fff4; }
+    #answer-slots.wrong-flash   { border-color: var(--color-danger);  background: #fff5f5; animation: shake 0.32s ease; }
+    @keyframes shake {
+      0%,100% { transform: translateX(0); }
+      25%     { transform: translateX(-7px); }
+      75%     { transform: translateX(7px); }
+    }
+
+    /* A placed tile inside the answer slots */
+    .placed-tile {
+      width: 40px; height: 46px;
+      display: flex; align-items: center; justify-content: center;
+      background: var(--color-primary); color: #fff;
+      font-size: 20px; font-weight: 700; border-radius: 8px;
+      cursor: pointer; user-select: none;
+      box-shadow: 0 3px 0 var(--color-primary-dark);
+      transition: transform 0.1s, box-shadow 0.1s;
+      animation: popIn 0.15s ease;
+    }
+    @keyframes popIn {
+      from { transform: scale(0.7); opacity: 0; }
+      to   { transform: scale(1);   opacity: 1; }
+    }
+    .placed-tile:active { transform: translateY(2px); box-shadow: 0 1px 0 var(--color-primary-dark); }
+
+    /* Empty slot placeholder */
+    .slot-placeholder {
+      width: 40px; height: 46px;
+      border: 2px dashed #c8d0f0;
+      border-radius: 8px; background: transparent;
+    }
+
+    /* Feedback below slots */
+    #feedback-msg {
+      font-size: 14px; font-weight: 600; min-height: 20px; text-align: center;
+    }
+    #feedback-msg.success { color: var(--color-success); }
+    #feedback-msg.error   { color: var(--color-danger); }
+
+    /* ── HINT ── */
+    #hint-area { display: flex; flex-direction: column; align-items: center; gap: 8px; width: 100%; }
+    #hint-btn {
+      padding: 7px 18px; font-size: 13px; font-weight: 600;
+      border-radius: 20px; border: 2px solid var(--color-warning);
+      background: transparent; color: var(--color-warning); cursor: pointer;
+      display: flex; align-items: center; gap: 6px;
+      transition: background 0.2s, color 0.2s, opacity 0.2s;
+    }
+    #hint-btn.state-hidden   { visibility: hidden; pointer-events: none; }
+    #hint-btn.state-inactive { opacity: 0.35; pointer-events: none; }
+    #hint-btn.state-active   { opacity: 1; pointer-events: auto; }
+    #hint-btn:active { background: var(--color-warning); color: #fff; }
+    #hint-text {
+      font-size: 13px; color: var(--color-warning); font-weight: 600;
+      display: none; text-align: center; animation: fadeUp 0.25s ease;
+    }
+    #hint-text.visible { display: block; }
+
+    /* ── LETTER POOL ── */
+    #letter-pool {
+      display: flex; flex-wrap: wrap; justify-content: center; gap: 8px;
+      width: 100%; padding: 4px 0 8px;
+    }
+    .pool-tile {
+      width: 44px; height: 50px;
+      display: flex; align-items: center; justify-content: center;
+      background: #fff; color: var(--color-dark);
+      font-size: 20px; font-weight: 700; border-radius: 8px;
+      cursor: pointer; user-select: none;
+      border: 2px solid #dde2f5;
+      box-shadow: 0 3px 0 #c4cae8;
+      transition: transform 0.1s, box-shadow 0.1s, opacity 0.15s;
+    }
+    .pool-tile:active { transform: translateY(2px); box-shadow: 0 1px 0 #c4cae8; }
+    .pool-tile.used {
+      opacity: 0; pointer-events: none;
+    }
+
+    /* ── BOTTOM BAR ── */
+    #action-bar {
+      flex-shrink: 0;
+      padding: 12px 20px;
+      padding-bottom: max(12px, env(safe-area-inset-bottom));
+      background: var(--color-background);
+      border-top: 1px solid rgba(0,0,0,0.07);
+    }
+    #action-btn {
+      width: 100%; padding: 15px;
+      font-size: 16px; font-weight: 700; border: none;
+      border-radius: var(--border-radius);
+      background: var(--color-primary); color: #fff;
+      cursor: pointer; transition: background 0.2s, transform 0.1s;
+    }
+    #action-btn:active { background: var(--color-primary-dark); transform: scale(0.98); }
+    #action-btn:disabled { opacity: 0.45; pointer-events: none; }
+
+    /* ── COMPLETION ── */
+    #completion-screen {
+      display: none; flex-direction: column;
+      align-items: center; justify-content: center;
+      position: absolute; inset: 0;
+      background: var(--color-background);
+      gap: 20px; padding: 32px 24px; text-align: center; z-index: 10;
+    }
+    #completion-screen.visible { display: flex; }
+    .completion-icon {
+      width: 80px; height: 80px; border-radius: 50%;
+      background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-primary-dark) 100%);
+      display: flex; align-items: center; justify-content: center;
+    }
+    .completion-icon svg { width: 40px; height: 40px; stroke: #fff; fill: none; stroke-width: 2.5; stroke-linecap: round; stroke-linejoin: round; }
+    #completion-screen h2 { font-size: 24px; font-weight: 700; color: var(--color-dark); }
+    #completion-screen p  { font-size: 15px; color: var(--color-text-muted); line-height: 1.5; }
+    #score-display { font-size: 44px; font-weight: 800; color: var(--color-primary); }
+    #finish-btn {
+      padding: 15px 40px; font-size: 16px; font-weight: 700;
+      border: none; border-radius: var(--border-radius);
+      background: var(--color-primary); color: #fff; cursor: pointer;
+    }
+    #finish-btn:active { background: var(--color-primary-dark); }
+  </style>
+</head>
+<body>
+
+<div id="loading-screen">
+  <div class="spinner"></div>
+  <p>Loading activity…</p>
+</div>
+
+<div id="app">
+  <!-- Header -->
+  <div id="header">
+    <div id="header-inner">
+      <div class="header-spacer"></div>
+      <span id="activity-title">Fill in the Blanks</span>
+      <button id="close-btn" aria-label="Close">
+        <svg viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+    <div id="progress-bar-wrap">
+      <div id="progress-track"><div id="progress-fill"></div></div>
+    </div>
+  </div>
+
+  <!-- Content -->
+  <div id="content-area">
+    <div id="question-card">
+
+      <div id="question-image-wrap">
+        <img id="question-image" src="" alt="" />
+      </div>
+
+      <div id="text-step-wrap">
+        <div id="step-1" class="text-step"><p id="step-1-text"></p></div>
+        <div id="step-2" class="text-step"><p id="step-2-text"></p></div>
+        <div id="step-3" class="text-step"><p id="step-3-text"></p></div>
+      </div>
+
+      <!-- Fill interaction -->
+      <div id="fill-area">
+        <!-- Answer slots — tiles drop here when tapped from pool -->
+        <div id="answer-slots"></div>
+
+        <div id="feedback-msg"></div>
+
+        <div id="hint-area">
+          <button id="hint-btn" class="state-hidden">💡 Hint</button>
+          <div id="hint-text"></div>
+        </div>
+
+        <!-- Shuffled letter pool -->
+        <div id="letter-pool"></div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Action bar -->
+  <div id="action-bar">
+    <button id="action-btn">Next</button>
+  </div>
+
+  <!-- Completion -->
+  <div id="completion-screen">
+    <div class="completion-icon">
+      <svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
+    </div>
+    <h2>Well done!</h2>
+    <p>You've completed all questions.</p>
+    <div id="score-display"></div>
+    <button id="finish-btn">Finish</button>
+  </div>
+</div>
+
+<script>
+// ═══════════════════════════════════════════
+// Bridge
+// ═══════════════════════════════════════════
+const isNative = typeof window.ReactNativeWebView !== 'undefined'
+
+function postToApp(key, data = null) {
+  const text = JSON.stringify({ key, data })
+  if (isNative) window.ReactNativeWebView.postMessage(text)
+  else window.parent.postMessage(text, '*')
+}
+
+let _reqId = 0
+const _pending = {}
+
+function restRequest(method, model, data, specialParams) {
+  return new Promise((resolve, reject) => {
+    const id = 'req-' + (++_reqId)
+    _pending[id] = { resolve, reject }
+    const text = JSON.stringify({ key: 'REST_REQUEST', method, model, data, id, specialParams: specialParams || null })
+    if (isNative) window.ReactNativeWebView.postMessage(text)
+    else window.parent.postMessage(text, '*')
+  })
+}
+
+function onMessage(event) {
+  try {
+    const msg = JSON.parse(event.data)
+    if (!msg || !msg.key) return
+    handleMessage(msg)
+  } catch (e) {}
+}
+document.addEventListener('message', onMessage)
+window.addEventListener('message', onMessage)
+
+// ═══════════════════════════════════════════
+// State
+// ═══════════════════════════════════════════
+const state = {}
+const REQUIRED = ['API', 'USER', 'AUTH', 'ACTIVITY', 'ACTIVITY_RESPONSE', 'QUESTIONS', 'CONFIG']
+let initialized = false
+
+let questions         = []
+let currentQIndex     = 0
+let totalScore        = 0
+let hasQuit           = false
+
+// Per-question
+let currentStep       = 1
+let currentQuestion   = null
+let correctAnswer     = ''   // e.g. "AUSTRALIA"
+let poolLetters       = []   // shuffled array: [{ letter, id, used }]
+let placedTiles       = []   // ordered array of pool-item ids placed by user
+let incorrectAttempts = 0
+let answered          = false
+
+// ═══════════════════════════════════════════
+// Message handler
+// ═══════════════════════════════════════════
+function handleMessage(msg) {
+  switch (msg.key) {
+    case 'REQUEST_RESPONSE': {
+      const p = _pending[msg.id]
+      if (p) { delete _pending[msg.id]; msg.error ? p.reject(new Error(msg.error)) : p.resolve(msg.data) }
+      break
+    }
+    default:
+      state[msg.key] = msg.data
+  }
+  if (!initialized && REQUIRED.every(k => state[k] !== undefined)) {
+    initialized = true
+    startTemplate()
+  }
+}
+
+// ═══════════════════════════════════════════
+// Theme
+// ═══════════════════════════════════════════
+async function applyTheme() {
+  try {
+    const [appRaw, settRaw] = await Promise.all([
+      restRequest('get', 'App', state.ACTIVITY_RESPONSE.app).catch(() => ({})),
+      restRequest('list', 'Settings', {}).catch(() => ({ items: [] }))
+    ])
+    const at = appRaw.theme || {}
+    const pt = (settRaw.items && settRaw.items[0]?.theme) || {}
+    const c  = Object.assign({}, pt.colors, at.colors)
+    const r  = document.documentElement
+    if (c.primary)   { r.style.setProperty('--color-primary', c.primary); r.style.setProperty('--color-primary-dark', darken(c.primary, 15)) }
+    if (c.secondary) r.style.setProperty('--color-secondary', c.secondary)
+    if (c.dark)      r.style.setProperty('--color-dark', c.dark)
+    if (c.light)     r.style.setProperty('--color-light', c.light)
+    const bg = at.generalBackground?.color || pt.generalBackground?.color
+    if (bg) r.style.setProperty('--color-background', bg)
+    const rm = { NONE:'0px', SMALL:'4px', MEDIUM:'8px', LARGE:'16px', FULL:'9999px' }
+    const rd = at.rounded || pt.rounded
+    if (rd && rm[rd]) r.style.setProperty('--border-radius', rm[rd])
+  } catch (e) {}
+}
+
+function darken(hex, amt) {
+  hex = hex.replace('#','')
+  if (hex.length === 3) hex = hex.split('').map(c => c+c).join('')
+  let [r,g,b] = [0,2,4].map(i => Math.max(0, parseInt(hex.slice(i,i+2),16) - amt))
+  return '#' + [r,g,b].map(v => v.toString(16).padStart(2,'0')).join('')
+}
+
+// ═══════════════════════════════════════════
+// Start
+// ═══════════════════════════════════════════
+async function startTemplate() {
+  await applyTheme()
+  const allQ = Array.isArray(state.QUESTIONS) ? state.QUESTIONS : []
+  questions  = allQ.filter(q => q.type === 'MULTICHOICE')
+  if (!questions.length) { postToApp('ERROR', { message: 'No MULTICHOICE questions found.' }); return }
+  document.getElementById('activity-title').textContent = state.ACTIVITY?.label || state.ACTIVITY?.name || 'Fill in the Blanks'
+  document.getElementById('loading-screen').style.display = 'none'
+  document.getElementById('app').classList.add('visible')
+  loadQuestion(0)
+}
+
+// ═══════════════════════════════════════════
+// Load question
+// ═══════════════════════════════════════════
+async function loadQuestion(index) {
+  currentQIndex     = index
+  currentQuestion   = questions[index]
+  currentStep       = 1
+  incorrectAttempts = 0
+  answered          = false
+  poolLetters       = []
+  placedTiles       = []
+
+  updateProgress()
+  resetUI()
+
+  // Parse label → three text steps
+  const label = currentQuestion.label || currentQuestion.text || ''
+  const parts  = label.split(/\|\||\n/)
+  const t1     = (parts[0] || '').trim()
+  const t2     = (parts[1] || '').trim()
+  const t3     = (parts[2] || '').trim()
+
+  // Extract correct answer from options (concatenate all option texts)
+  const opts = (currentQuestion.options || []).filter(o => o.text)
+  correctAnswer = opts.map(o => o.text.trim().replace(/[^A-Za-z0-9]/g,'')).join('').toUpperCase()
+
+  // Build blank underscores for display in step 3
+  const blankDisplay = correctAnswer ? correctAnswer.split('').map(() => '_').join(' ') : '_ _ _'
+
+  const renderText = (raw) => {
+    if (!raw) return '&nbsp;'
+    return raw.replace(/\[[^\]]*\]/, `<span class="blank-word">${blankDisplay}</span>`)
+  }
+  document.getElementById('step-1-text').innerHTML = renderText(t1)
+  document.getElementById('step-2-text').innerHTML = renderText(t2)
+  document.getElementById('step-3-text').innerHTML = renderText(t3)
+
+  // Build the letter pool: correct letters + random padding up to 6 total (or more if answer > 6)
+  buildLetterPool(correctAnswer)
+
+  await loadQuestionImage(currentQuestion)
+  showStep(1)
+}
+
+// ═══════════════════════════════════════════
+// Letter pool builder
+// ═══════════════════════════════════════════
+const ALPHA = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'
+
+function buildLetterPool(answer) {
+  // Start with the exact letters of the answer
+  const answerLetters = answer.split('')
+  // Pad with random letters until we have max(6, answerLength + 2) total
+  const targetCount   = Math.max(6, answerLetters.length + 2)
+  const padCount      = targetCount - answerLetters.length
+  const padding       = []
+  for (let i = 0; i < padCount; i++) {
+    // Pick a random letter (avoid exact duplicates of answer if possible, but allow them)
+    padding.push(ALPHA[Math.floor(Math.random() * 26)])
+  }
+  const all = [...answerLetters, ...padding]
+  // Shuffle
+  for (let i = all.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [all[i], all[j]] = [all[j], all[i]]
+  }
+  poolLetters = all.map((letter, idx) => ({ letter, id: 'pl-' + idx, used: false }))
+}
+
+// ═══════════════════════════════════════════
+// Render pool + slots
+// ═══════════════════════════════════════════
+function renderPool() {
+  const pool = document.getElementById('letter-pool')
+  pool.innerHTML = ''
+  poolLetters.forEach(item => {
+    const tile = document.createElement('div')
+    tile.className = 'pool-tile' + (item.used ? ' used' : '')
+    tile.textContent = item.letter
+    tile.dataset.id  = item.id
+    tile.addEventListener('click', () => onPoolTap(item.id))
+    pool.appendChild(tile)
+  })
+}
+
+function renderSlots() {
+  const slots = document.getElementById('answer-slots')
+  slots.innerHTML = ''
+  const targetLen = correctAnswer.length
+
+  for (let i = 0; i < targetLen; i++) {
+    if (i < placedTiles.length) {
+      // Filled slot — show placed tile
+      const pid    = placedTiles[i]
+      const item   = poolLetters.find(p => p.id === pid)
+      const tile   = document.createElement('div')
+      tile.className   = 'placed-tile'
+      tile.textContent = item ? item.letter : '?'
+      tile.dataset.pos = i
+      tile.addEventListener('click', () => onPlacedTap(i))
+      slots.appendChild(tile)
+    } else {
+      // Empty placeholder
+      const ph = document.createElement('div')
+      ph.className = 'slot-placeholder'
+      slots.appendChild(ph)
+    }
+  }
+
+  // Enable submit only when all slots filled and not yet answered
+  const actionBtn = document.getElementById('action-btn')
+  if (currentStep === 'fill' && !answered) {
+    if (placedTiles.length === targetLen) {
+      actionBtn.textContent = 'Submit'
+      actionBtn.disabled    = false
+    } else {
+      actionBtn.textContent = 'Submit'
+      actionBtn.disabled    = true
+    }
+  }
+}
+
+function onPoolTap(id) {
+  if (answered) return
+  const item = poolLetters.find(p => p.id === id)
+  if (!item || item.used) return
+  if (placedTiles.length >= correctAnswer.length) return
+  item.used = true
+  placedTiles.push(id)
+  renderSlots()
+  renderPool()
+}
+
+function onPlacedTap(pos) {
+  if (answered) return
+  const pid  = placedTiles[pos]
+  const item = poolLetters.find(p => p.id === pid)
+  if (item) item.used = false
+  placedTiles.splice(pos, 1)
+  renderSlots()
+  renderPool()
+}
+
+// ═══════════════════════════════════════════
+// Step flow
+// ═══════════════════════════════════════════
+function showStep(step) {
+  currentStep = step
+  document.querySelectorAll('.text-step').forEach(el => el.classList.remove('active'))
+  document.getElementById('fill-area').classList.remove('visible')
+  const actionBtn = document.getElementById('action-btn')
+
+  if (step === 'fill') {
+    document.getElementById('fill-area').classList.add('visible')
+    renderPool()
+    renderSlots()
+    // action-btn state handled by renderSlots
+    actionBtn.textContent = 'Submit'
+    actionBtn.disabled    = true
+  } else {
+    document.getElementById('step-' + step)?.classList.add('active')
+    actionBtn.textContent = 'Next'
+    actionBtn.disabled    = false
+  }
+}
+
+function advanceStep() {
+  if      (currentStep === 1) showStep(2)
+  else if (currentStep === 2) showStep(3)
+  else if (currentStep === 3) correctAnswer ? showStep('fill') : goNextQuestion()
+}
+
+// ═══════════════════════════════════════════
+// Submit answer
+// ═══════════════════════════════════════════
+function submitAnswer() {
+  if (answered || placedTiles.length !== correctAnswer.length) return
+
+  const userAns = placedTiles
+    .map(id => poolLetters.find(p => p.id === id)?.letter || '')
+    .join('')
+    .toUpperCase()
+
+  const isCorrect = userAns === correctAnswer.toUpperCase()
+  const slots     = document.getElementById('answer-slots')
+
+  if (isCorrect) {
+    answered = true
+    slots.classList.add('correct-flash')
+    showFeedback('Correct! 🎉', 'success')
+    totalScore++
+    document.getElementById('action-btn').textContent = 'Next'
+    document.getElementById('action-btn').disabled    = false
+    // Disable pool interaction
+    document.querySelectorAll('.pool-tile').forEach(t => t.style.pointerEvents = 'none')
+
+    // Submit to Cogniss
+    const correctOption = (currentQuestion.options || []).find(o => o.correct)
+    const submitOpt     = correctOption || (currentQuestion.options || [])[0]
+    if (submitOpt) {
+      postToApp('QUESTION_RESPONSE', { index: currentQIndex, option: { _id: submitOpt._id }, duration: 0 })
+    }
+  } else {
+    incorrectAttempts++
+    slots.classList.add('wrong-flash')
+    setTimeout(() => slots.classList.remove('wrong-flash'), 380)
+    showFeedback('Not quite — try again!', 'error')
+    // Return all tiles to pool
+    placedTiles.forEach(id => { const item = poolLetters.find(p => p.id === id); if (item) item.used = false })
+    placedTiles = []
+    renderSlots()
+    renderPool()
+    updateHintState()
+  }
+}
+
+// ═══════════════════════════════════════════
+// Hint
+// ═══════════════════════════════════════════
+function updateHintState() {
+  const btn = document.getElementById('hint-btn')
+  if (incorrectAttempts === 0) { btn.className = 'state-hidden'; return }
+  if (incorrectAttempts === 1) { btn.className = 'state-inactive'; return }
+  btn.className = 'state-active'
+}
+
+document.getElementById('hint-btn').addEventListener('click', function () {
+  if (incorrectAttempts < 2) return
+  document.getElementById('hint-text').textContent = 'Answer: ' + correctAnswer
+  document.getElementById('hint-text').classList.add('visible')
+  this.style.display = 'none'
+})
+
+// ═══════════════════════════════════════════
+// Feedback
+// ═══════════════════════════════════════════
+function showFeedback(msg, type) {
+  const el = document.getElementById('feedback-msg')
+  el.textContent = msg
+  el.className   = type
+}
+function clearFeedback() {
+  const el = document.getElementById('feedback-msg')
+  el.textContent = ''
+  el.className   = ''
+}
+
+// ═══════════════════════════════════════════
+// Image
+// ═══════════════════════════════════════════
+async function loadQuestionImage(q) {
+  const wrap = document.getElementById('question-image-wrap')
+  const img  = document.getElementById('question-image')
+  if (!q.image) { wrap.classList.remove('visible'); return }
+  try {
+    const file = await restRequest('get', 'File', q.image)
+    if (file?.url) { img.src = file.url; wrap.classList.add('visible') }
+    else wrap.classList.remove('visible')
+  } catch { wrap.classList.remove('visible') }
+}
+
+// ═══════════════════════════════════════════
+// Navigation + completion
+// ═══════════════════════════════════════════
+function goNextQuestion() {
+  const next = currentQIndex + 1
+  if (next < questions.length) loadQuestion(next)
+  else showCompletion()
+}
+
+function updateProgress() {
+  const pct = questions.length > 1 ? (currentQIndex / (questions.length - 1)) * 100 : 0
+  document.getElementById('progress-fill').style.width = pct + '%'
+}
+
+function resetUI() {
+  clearFeedback()
+  document.getElementById('answer-slots').classList.remove('correct-flash', 'wrong-flash')
+  document.getElementById('hint-btn').className = 'state-hidden'
+  document.getElementById('hint-btn').style.display = ''
+  document.getElementById('hint-text').classList.remove('visible')
+  document.getElementById('hint-text').textContent = ''
+  document.getElementById('answer-slots').innerHTML = ''
+  document.getElementById('letter-pool').innerHTML = ''
+}
+
+function showCompletion() {
+  document.getElementById('progress-fill').style.width = '100%'
+  document.getElementById('completion-screen').classList.add('visible')
+  const pct = questions.length > 0 ? Math.round((totalScore / questions.length) * 100) : 0
+  document.getElementById('score-display').textContent = pct + '%'
+  const h2 = document.querySelector('#completion-screen h2')
+  const p  = document.querySelector('#completion-screen p')
+  h2.textContent = pct === 100 ? 'Perfect Score! 🌟' : pct >= 60 ? 'Well done!' : 'Activity Complete'
+  p.textContent  = `You got ${totalScore} out of ${questions.length} correct.`
+}
+
+document.getElementById('finish-btn').addEventListener('click', function () {
+  if (hasQuit) return
+  hasQuit = true
+  const pct = questions.length > 0 ? Math.round((totalScore / questions.length) * 100) : 0
+  postToApp('QUIT', { completeState: pct >= 60 ? 'PASS' : 'COMPLETE', customScore: pct })
+})
+
+// ═══════════════════════════════════════════
+// Action button
+// ═══════════════════════════════════════════
+document.getElementById('action-btn').addEventListener('click', function () {
+  if (currentStep === 'fill') {
+    if (answered) goNextQuestion()
+    else submitAnswer()
+  } else {
+    advanceStep()
+  }
+})
+
+// ═══════════════════════════════════════════
+// Close
+// ═══════════════════════════════════════════
+document.getElementById('close-btn').addEventListener('click', function () {
+  if (hasQuit) return
+  hasQuit = true
+  postToApp('QUIT', { completeState: 'COMPLETE' })
+})
+
+// ═══════════════════════════════════════════
+// Boot
+// ═══════════════════════════════════════════
+window.addEventListener('load', () => postToApp('READY_DYNAMIC_MEDIA'))
+</script>
+</body>
+</html>
