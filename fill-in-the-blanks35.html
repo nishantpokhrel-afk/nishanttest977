@@ -1,0 +1,1060 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>Fill in the Blanks</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --color-primary: #4a6cf7;
+      --color-primary-dark: #3a5ce4;
+      --color-dark: #1a1a2e;
+      --color-light: #f8f9ff;
+      --color-background: #ffffff;
+      --color-success: #28a745;
+      --color-danger: #dc3545;
+      --color-warning: #e6a817;
+      --color-text: #333333;
+      --color-text-muted: #888888;
+      --border-radius: 12px;
+    }
+
+    html, body {
+      height: 100%; width: 100%; overflow: hidden;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+      background: var(--color-background);
+      color: var(--color-text);
+    }
+
+    /* ── LOADING ── */
+    #loading-screen {
+      position: fixed; inset: 0; z-index: 999;
+      display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 16px;
+      background: var(--color-background);
+    }
+    .spinner {
+      width: 40px; height: 40px; border-radius: 50%;
+      border: 3px solid rgba(0,0,0,0.1); border-top-color: var(--color-primary);
+      animation: spin 0.8s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    #loading-screen p { font-size: 14px; color: var(--color-text-muted); }
+
+    /* ── SHELL ── */
+    #app { display: none; flex-direction: column; height: 100%; width: 100%; position: relative; overflow: hidden; }
+    #app.visible { display: flex; }
+
+    /* ── HEADER ── */
+    #header { flex-shrink: 0; background: var(--color-primary); padding-top: 50px; }
+    #header-inner {
+      display: flex; align-items: center; gap: 12px;
+      padding: 12px 16px 0; min-height: 56px;
+    }
+    .header-spacer { width: 36px; flex-shrink: 0; }
+    #activity-title {
+      flex: 1; text-align: center;
+      font-size: 17px; font-weight: 700; color: #fff;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    #close-btn {
+      width: 36px; height: 36px; flex-shrink: 0;
+      border-radius: 50%; border: none; cursor: pointer;
+      background: rgba(255,255,255,0.2);
+      display: flex; align-items: center; justify-content: center;
+    }
+    #close-btn:active { background: rgba(255,255,255,0.35); }
+    #close-btn svg { width: 18px; height: 18px; stroke: #fff; fill: none; stroke-width: 2.5; stroke-linecap: round; }
+    #progress-bar-wrap { padding: 10px 100px 14px; }
+    #progress-track { height: 6px; background: rgba(255,255,255,0.3); border-radius: 3px; overflow: hidden; }
+    #progress-fill { height: 100%; background: #fff; border-radius: 3px; width: 0%; transition: width 0.4s ease; }
+
+    /* ── CONTENT ── */
+    #content-area {
+      flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch;
+      display: flex; flex-direction: column; align-items: center; justify-content: flex-start;
+      padding: 50px 20px 16px;
+    }
+    #question-card {
+      width: 100%; max-width: 460px;
+      display: flex; flex-direction: column; align-items: center; gap: 20px;
+    }
+
+    /* ── IMAGE ── */
+    #question-image-wrap {
+      width: 300px; height: 300px; border-radius: var(--border-radius);
+      overflow: hidden; display: none; flex-shrink: 0;
+    }
+    #question-image-wrap.visible { display: block; }
+    #question-image { width: 300px; height: 300px; object-fit: cover; display: block; }
+
+    /* ── TEXT STEPS ── */
+    /* All three lines are always visible at once, shown as a simple stack */
+    #text-block {
+      width: 100%; display: none; flex-direction: column; gap: 12px;
+      animation: fadeUp 0.3s ease;
+    }
+    #text-block.visible { display: flex; }
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(8px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    .text-row {
+      display: flex; justify-content: center;
+    }
+    .text-value {
+      font-size: 16px; line-height: 1.55; color: var(--color-text); text-align: center;
+    }
+    #row-3 .text-value {
+      font-size: 18px; font-weight: 700;
+    }
+    #row-1.survey-text .text-value {
+      font-size: 20px; font-weight: 600; line-height: 1.45;
+    }
+    .text-value .blank-word {
+      font-weight: 700; color: var(--color-primary);
+    }
+
+    /* Divider between text block and fill area */
+    .divider {
+      width: 100%; height: 1px; background: #e8eaf0;
+    }
+
+    /* ── FILL AREA ── */
+    #fill-area {
+      display: none; width: 100%;
+      flex-direction: column; align-items: center; gap: 12px;
+      animation: fadeUp 0.3s ease;
+    }
+    #fill-area.visible { display: flex; }
+
+    /* The word display — fixed letters + fillable gap slots */
+    #word-display {
+      display: flex; flex-wrap: wrap; justify-content: center; align-items: flex-end; gap: 4px;
+      padding: 4px 0;
+    }
+    /* Already-revealed letter — static */
+    .fixed-letter {
+      width: 36px; height: 46px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 22px; font-weight: 700; color: var(--color-dark);
+    }
+    /* Empty gap awaiting a letter */
+    .slot-empty {
+      width: 36px; height: 46px;
+      display: flex; align-items: flex-end; justify-content: center;
+      padding-bottom: 4px;
+      border-bottom: 3px solid #c0c8e8;
+    }
+    /* User-placed letter in a gap */
+    .placed-tile {
+      width: 36px; height: 46px;
+      display: flex; align-items: center; justify-content: center;
+      background: var(--color-primary); color: #fff;
+      font-size: 20px; font-weight: 700; border-radius: 8px;
+      cursor: pointer; user-select: none;
+      box-shadow: 0 3px 0 var(--color-primary-dark);
+      animation: popIn 0.15s ease;
+      transition: transform 0.1s, box-shadow 0.1s;
+    }
+    .placed-tile:active { transform: translateY(2px); box-shadow: 0 1px 0 var(--color-primary-dark); }
+    @keyframes popIn {
+      from { transform: scale(0.7); opacity: 0; }
+      to   { transform: scale(1);   opacity: 1; }
+    }
+
+    /* shake on wrong, green on correct */
+    #word-display.wrong-flash { animation: shake 0.32s ease; }
+    .placed-tile.wrong-placed { background: var(--color-danger); box-shadow: 0 3px 0 #9b2335; cursor: default; font-size: 14px; }
+    .placed-tile.feedback-wrong { background: var(--color-danger); box-shadow: 0 3px 0 #9b2335; cursor: default; color: #fff; }
+    @keyframes shake {
+      0%,100% { transform: translateX(0); }
+      25%     { transform: translateX(-8px); }
+      75%     { transform: translateX(8px); }
+    }
+
+    /* Feedback (inline, kept for compat but hidden) */
+    #feedback-msg { display: none; }
+
+    /* ── GAP FEEDBACK (inline, replaces word+pool) ── */
+    .gap-feedback {
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      gap: 16px; padding: 24px 0; text-align: center;
+      width: 100%; animation: fadeUp 0.25s ease;
+    }
+    .gap-feedback.hidden { display: none; }
+    #gap-feedback-msg {
+      font-size: 17px; font-weight: 600; line-height: 1.5;
+    }
+    #gap-feedback-msg.correct { color: var(--color-success); }
+    #gap-feedback-msg.incorrect { color: var(--color-danger); }
+    #gap-feedback-btn {
+      padding: 13px 36px; font-size: 15px; font-weight: 700;
+      border: none; border-radius: var(--border-radius);
+      background: var(--color-primary); color: #fff;
+      cursor: pointer; transition: background 0.15s;
+    }
+    #gap-feedback-btn:active { background: var(--color-primary-dark); }
+
+    /* ── CLUE ── */
+    #hint-area { display: flex; flex-direction: column; align-items: center; gap: 8px; }
+    #hint-btn {
+      padding: 7px 18px; font-size: 13px; font-weight: 600;
+      border-radius: 20px; border: 2px solid var(--color-primary);
+      background: transparent; color: var(--color-primary);
+      cursor: pointer; display: flex; align-items: center; gap: 5px;
+      transition: opacity 0.2s, background 0.15s, color 0.15s;
+    }
+    #hint-btn.state-hidden   { visibility: hidden; pointer-events: none; }
+    #hint-btn.state-inactive { opacity: 0.35; pointer-events: none; }
+    #hint-btn.state-active   { opacity: 1; pointer-events: auto; }
+    #hint-btn:active { background: var(--color-primary); color: #fff; }
+    #hint-text { font-size: 15px; font-weight: 700; color: var(--color-dark); display: none; text-align: center; letter-spacing: 2px; }
+    #hint-text.visible { display: block; animation: fadeUp 0.2s ease; }
+
+    /* ── GAP INSTRUCTION ── */
+    #gap-instruction {
+      font-size: 13px; font-weight: 600; color: var(--color-text-muted);
+      text-align: center; min-height: 18px; letter-spacing: 0.01em;
+      margin-top: -6px;
+    }
+
+    /* ── SURVEY OPTIONS ── */
+    #survey-area { width: 100%; display: flex; flex-direction: column; gap: 10px; }
+    .survey-option {
+      width: 100%; padding: 15px 20px;
+      font-size: 16px; font-weight: 500; text-align: center;
+      border: 2px solid #dde2f5; border-radius: var(--border-radius);
+      background: #fff; color: var(--color-dark);
+      cursor: pointer; transition: border-color 0.15s, background 0.15s;
+    }
+    .survey-option:active { border-color: var(--color-primary); background: var(--color-light); }
+    .survey-option.selected {
+      border-color: var(--color-primary); background: var(--color-primary);
+      color: #fff; font-weight: 700;
+    }
+
+    /* ── LETTER POOL ── */
+    #letter-pool {
+      display: flex; flex-wrap: wrap; justify-content: center; gap: 8px;
+      width: 100%; padding: 4px 0 4px;
+    }
+    .pool-tile {
+      width: 44px; height: 50px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 20px; font-weight: 700; border-radius: 8px;
+      cursor: pointer; user-select: none;
+      background: #fff; color: var(--color-dark);
+      border: 2px solid #dde2f5;
+      box-shadow: 0 3px 0 #c4cae8;
+      transition: transform 0.1s, box-shadow 0.1s, opacity 0.15s;
+    }
+    .pool-tile:active { transform: translateY(2px); box-shadow: 0 1px 0 #c4cae8; }
+    .pool-tile.used { opacity: 0; pointer-events: none; }
+    .pool-tile.wrong-tile {
+      border-color: var(--color-danger); color: var(--color-danger);
+      animation: wrongShake 0.4s ease;
+    }
+    @keyframes wrongShake {
+      0%,100% { transform: translateX(0); }
+      20%     { transform: translateX(-5px); }
+      60%     { transform: translateX(5px); }
+    }
+
+    /* ── BOTTOM BAR ── */
+    #action-bar {
+      flex-shrink: 0; background: var(--color-background);
+      border-top: 1px solid rgba(0,0,0,0.07);
+      padding: 12px 20px max(12px, env(safe-area-inset-bottom));
+      display: flex; justify-content: center;
+    }
+    #action-btn {
+      padding: 13px 28px;
+      font-size: 16px; font-weight: 700; border: none;
+      border-radius: var(--border-radius);
+      background: var(--color-primary); color: #fff;
+      cursor: pointer; transition: background 0.15s, transform 0.1s;
+      white-space: nowrap;
+    }
+    #action-btn:active { background: var(--color-primary-dark); transform: scale(0.98); }
+    #action-btn:disabled { opacity: 0.45; pointer-events: none; }
+
+    /* ── COMPLETION ── */
+    #completion-screen { display: none; }
+  </style>
+</head>
+<body>
+
+<div id="loading-screen">
+  <div class="spinner"></div>
+  <p>Loading activity…</p>
+</div>
+
+<div id="app">
+  <div id="header">
+    <div id="header-inner">
+      <div class="header-spacer"></div>
+      <span id="activity-title">Fill in the Blanks</span>
+      <button id="close-btn" aria-label="Close">
+        <svg viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+    <div id="progress-bar-wrap">
+      <div id="progress-track"><div id="progress-fill"></div></div>
+    </div>
+  </div>
+
+  <div id="content-area">
+    <div id="question-card">
+
+      <!-- Image -->
+      <div id="question-image-wrap">
+        <img id="question-image" src="" alt="" />
+      </div>
+
+      <!-- Three text lines, always shown together once fill step begins -->
+      <!-- During steps 1/2/3 we show progressively; at 'fill' all three are visible -->
+      <div id="text-block">
+        <div class="text-row" id="row-1">
+          <span class="text-value" id="val-1"></span>
+        </div>
+        <div class="text-row" id="row-2" style="display:none">
+          <span class="text-value" id="val-2"></span>
+        </div>
+        <div class="text-row" id="row-3" style="display:none">
+          <span class="text-value" id="val-3"></span>
+        </div>
+      </div>
+
+      <div class="divider" id="divider" style="display:none"></div>
+
+      <!-- Fill interaction -->
+      <div id="fill-area">
+        <div id="word-display"></div>
+        <div id="feedback-msg"></div>
+        <div id="hint-area">
+          <button id="hint-btn" class="state-hidden">💡 Clue</button>
+          <div id="hint-text"></div>
+        </div>
+        <div id="gap-instruction"></div>
+        <div id="letter-pool"></div>
+      </div>
+
+      <!-- Survey options (for MULTICHOICE without guess word) -->
+      <div id="survey-area" style="display:none">
+        <div id="survey-options"></div>
+      </div>
+
+      <!-- Per-gap feedback overlay -->
+      <div id="gap-feedback" class="gap-feedback hidden">
+        <div id="gap-feedback-msg"></div>
+        <button id="gap-feedback-btn"></button>
+      </div>
+
+    </div>
+  </div>
+
+  <div id="action-bar">
+    <button id="action-btn">Next</button>
+  </div>
+
+  <div id="completion-screen"></div>
+</div>
+
+<script>
+// ═══════════════════════════════════
+// Bridge
+// ═══════════════════════════════════
+const isNative = typeof window.ReactNativeWebView !== 'undefined'
+
+function postToApp(key, data = null) {
+  const msg = JSON.stringify({ key, data })
+  if (isNative) window.ReactNativeWebView.postMessage(msg)
+  else window.parent.postMessage(msg, '*')
+}
+
+let _reqId = 0
+const _pending = {}
+function restRequest(method, model, data, specialParams) {
+  return new Promise((resolve, reject) => {
+    const id = 'req-' + (++_reqId)
+    _pending[id] = { resolve, reject }
+    const msg = JSON.stringify({ key: 'REST_REQUEST', method, model, data, id, specialParams: specialParams || null })
+    if (isNative) window.ReactNativeWebView.postMessage(msg)
+    else window.parent.postMessage(msg, '*')
+  })
+}
+
+function onMessage(event) {
+  try { const m = JSON.parse(event.data); if (m && m.key) handleMessage(m) } catch(e) {}
+}
+document.addEventListener('message', onMessage)
+window.addEventListener('message', onMessage)
+
+// ═══════════════════════════════════
+// App state
+// ═══════════════════════════════════
+const appState = {}
+const REQUIRED = ['API', 'USER', 'AUTH', 'ACTIVITY', 'ACTIVITY_RESPONSE', 'QUESTIONS', 'CONFIG']
+let initialized = false
+
+let questions     = []
+let qIndex        = 0
+let totalScore    = 0
+let hasQuit       = false
+
+// Per-question
+let currentStep       = 1   // 1, 2, 3, 'fill'
+let currentQ          = null
+let correctAnswer     = ''  // only the gap letters e.g. "AN" for CA_B_RRA
+let wordStructure     = []  // [{type:'fixed',char:'C'}, {type:'gap',answer:'A'}, ...]
+let questionMode      = 'fill'  // 'fill' | 'display' | 'survey'
+let surveySelected    = null
+let poolLetters       = []
+let placedTiles       = []  // kept for compat
+let placedMap         = {}  // gapIndex -> poolId
+let gapAttempts       = {}  // gapIndex -> wrong attempt count
+let incorrectAttempts = 0
+let answered          = false
+
+let _qrCallbacks = []  // callbacks waiting for QUESTION_RESPONSE ack
+
+function handleMessage(m) {
+  if (m.key === 'REQUEST_RESPONSE') {
+    const p = _pending[m.id]
+    if (p) { delete _pending[m.id]; m.error ? p.reject(new Error(m.error)) : p.resolve(m.data) }
+    return
+  }
+  if (m.key === 'QUESTION_RESPONSE') {
+    // Container has acknowledged a submitted answer — fire any waiting callbacks
+    const cb = _qrCallbacks.shift()
+    if (cb) cb(m.data)
+    return
+  }
+  appState[m.key] = m.data
+  if (!initialized && REQUIRED.every(k => appState[k] !== undefined)) {
+    initialized = true
+    startTemplate()
+  }
+}
+
+// Submit a question response and get a promise that resolves when the container acknowledges it
+function submitQuestionResponse(payload) {
+  return new Promise(resolve => {
+    _qrCallbacks.push(resolve)
+    postToApp('QUESTION_RESPONSE', payload)
+  })
+}
+
+// ═══════════════════════════════════
+// Theme
+// ═══════════════════════════════════
+async function applyTheme() {
+  try {
+    const [appRaw, settRaw] = await Promise.all([
+      (appState.ACTIVITY_RESPONSE.app ? restRequest('get', 'App', appState.ACTIVITY_RESPONSE.app) : Promise.resolve({})).catch(() => ({})),
+      restRequest('list', 'Settings', {}).catch(() => ({ items: [] }))
+    ])
+    const at = appRaw.theme || {}
+    const pt = (settRaw.items && settRaw.items[0]?.theme) || {}
+    const c  = Object.assign({}, pt.colors, at.colors)
+    const r  = document.documentElement
+    if (c.primary) {
+      r.style.setProperty('--color-primary', c.primary)
+      r.style.setProperty('--color-primary-dark', darken(c.primary, 15))
+    }
+    if (c.dark)  r.style.setProperty('--color-dark', c.dark)
+    if (c.light) r.style.setProperty('--color-light', c.light)
+    const bg = at.generalBackground?.color || pt.generalBackground?.color
+    if (bg) r.style.setProperty('--color-background', bg)
+    const rm = { NONE:'0px', SMALL:'4px', MEDIUM:'8px', LARGE:'16px', FULL:'9999px' }
+    const rd = at.rounded || pt.rounded
+    if (rd && rm[rd]) r.style.setProperty('--border-radius', rm[rd])
+  } catch(e) {}
+}
+function darken(hex, amt) {
+  hex = hex.replace('#','')
+  if (hex.length === 3) hex = hex.split('').map(c=>c+c).join('')
+  const [r,g,b] = [0,2,4].map(i => Math.max(0, parseInt(hex.slice(i,i+2),16) - amt))
+  return '#' + [r,g,b].map(v=>v.toString(16).padStart(2,'0')).join('')
+}
+
+// ═══════════════════════════════════
+// Start
+// ═══════════════════════════════════
+async function startTemplate() {
+  await applyTheme()
+  const allQ = Array.isArray(appState.QUESTIONS) ? appState.QUESTIONS : []
+  questions  = allQ.filter(q => q.type === 'MULTICHOICE' || q.type === 'TEXT')
+  if (!questions.length) { postToApp('ERROR', { message: 'No MULTICHOICE questions found.' }); return }
+  document.getElementById('loading-screen').style.display = 'none'
+  document.getElementById('app').classList.add('visible')
+  loadQuestion(0)
+}
+
+// ═══════════════════════════════════
+// Load a question block
+// ═══════════════════════════════════
+async function loadQuestion(index) {
+  qIndex            = index
+  currentQ          = questions[index]
+  currentStep       = 1
+  incorrectAttempts = 0
+  answered          = false
+  poolLetters       = []
+  placedTiles       = []
+  placedMap         = {}
+  wordStructure     = []
+  gapAttempts       = {}
+  surveySelected    = null
+  questionMode      = 'fill'
+
+  updateProgress()
+  resetUI()
+
+  // ── Title: use the data label of THIS content block ──
+  document.getElementById('activity-title').textContent =
+    currentQ.label || currentQ.text || 'Fill in the Blanks'
+
+  // ── Parse face label ──
+  const rawText  = currentQ.text || ''
+  const allLines = rawText.split('\n').map(l => l.trim())
+
+  // Detect guess-word mode: requires both a [PATTERN] and "Correct word: [WORD]"
+  const correctWordMatch = allLines
+    .map(l => l.match(/^correct\s*word\s*:\s*\[([^\]]+)\]/i))
+    .find(m => m)
+  const correctWord = correctWordMatch ? correctWordMatch[1].toUpperCase() : ''
+
+  const patternMatch = allLines
+    .filter(l => !/^correct\s*word/i.test(l))
+    .map(l => l.match(/\[([^\]]+)\]/))
+    .find(m => m)
+  const wordPattern = patternMatch ? patternMatch[1].toUpperCase() : ''
+
+  // ── Determine mode ──
+  const hasOptions = (currentQ.options || []).filter(o => o.text).length > 0
+  if (wordPattern && correctWord) {
+    questionMode = 'fill'
+  } else if (hasOptions || currentQ.type === 'TEXT') {
+    // TEXT blocks and MULTICHOICE without guess word both use survey-style rendering
+    questionMode = 'survey'
+  } else {
+    questionMode = 'display'
+  }
+
+  if (questionMode === 'fill') {
+    // Build wordStructure for guess-word
+    let cwPos = 0
+    wordStructure = []
+    for (let i = 0; i < wordPattern.length; i++) {
+      const ch = wordPattern[i]
+      if (ch === '_') {
+        wordStructure.push({ type: 'gap', answer: correctWord[cwPos] || '?' })
+      } else {
+        wordStructure.push({ type: 'fixed', char: ch })
+      }
+      cwPos++
+    }
+    const gapLetters = wordStructure.filter(p => p.type === 'gap').map(p => p.answer).join('')
+    correctAnswer = gapLetters
+    buildLetterPool(gapLetters)
+
+    // Progressive text lines (Line 1: / Line 2: / Line 3: logic)
+    function renderLine(raw) {
+      if (!raw) return ''
+      if (/^correct\s*word/i.test(raw)) return ''
+      return raw.replace(/^line\s*\d+\s*:\s*/i, '').replace(/\[[^\]]*\]/g, '').trim()
+    }
+    const displayLines = allLines.map(renderLine).filter(l => l.length > 0).slice(0, 3)
+    const t1 = displayLines[0] || ''; const t2 = displayLines[1] || ''; const t3 = displayLines[2] || ''
+    document.getElementById('val-1').textContent = t1
+    document.getElementById('val-2').textContent = t2
+    document.getElementById('val-3').textContent = t3
+    document.getElementById('row-1').style.display = t1 ? 'flex' : 'none'
+    document.getElementById('row-2').style.display = 'none'
+    document.getElementById('row-3').style.display = 'none'
+  } else {
+    // Survey / display: just show question.text as-is in a single block, no Line N parsing
+    const questionText = rawText.trim()
+    document.getElementById('val-1').innerHTML = questionText.replace(/\n/g, '<br>')
+    document.getElementById('row-1').classList.add('survey-text')
+    document.getElementById('val-2').textContent = ''
+    document.getElementById('val-3').textContent = ''
+    document.getElementById('row-1').style.display = questionText ? 'flex' : 'none'
+    document.getElementById('row-2').style.display = 'none'
+    document.getElementById('row-3').style.display = 'none'
+  }
+
+  await loadQuestionImage(currentQ)
+  if (questionMode === 'survey') showStep('survey')
+  else if (questionMode === 'display') showStep('display')
+  else showStep(1)
+}
+
+// ═══════════════════════════════════
+// Step display
+// ═══════════════════════════════════
+function showStep(step) {
+  currentStep = step
+  const actionBtn  = document.getElementById('action-btn')
+  const textBlock  = document.getElementById('text-block')
+  const fillArea   = document.getElementById('fill-area')
+  const surveyArea = document.getElementById('survey-area')
+  const divider    = document.getElementById('divider')
+
+  textBlock.classList.add('visible')
+
+  // Show rows progressively — only reveal a row if it has content
+  const hasT = (id) => document.getElementById(id).textContent.trim().length > 0
+  const showAll = (step === 'survey' || step === 'display')
+  document.getElementById('row-1').style.display = hasT('val-1') ? 'flex' : 'none'
+  document.getElementById('row-2').style.display = (showAll || step >= 2 || step === 'fill') && hasT('val-2') ? 'flex' : 'none'
+  document.getElementById('row-3').style.display = (showAll || step >= 3 || step === 'fill') && hasT('val-3') ? 'flex' : 'none'
+
+  fillArea.classList.remove('visible')
+  surveyArea.style.display = 'none'
+  divider.style.display    = 'none'
+
+  if (step === 'fill') {
+    divider.style.display = 'block'
+    fillArea.classList.add('visible')
+    renderPool()
+    renderSlots()
+    updateGapInstruction()
+    actionBtn.textContent      = 'Next'
+    actionBtn.style.visibility = 'hidden'
+    actionBtn.disabled         = false
+  } else if (step === 'survey') {
+    divider.style.display    = 'block'
+    surveyArea.style.display = 'flex'
+    renderSurveyOptions()
+    actionBtn.textContent      = currentQ.type === 'TEXT' ? 'Next Scenario' : 'Next'
+    actionBtn.style.visibility = 'visible'
+    actionBtn.disabled         = true  // enabled only after selection
+  } else if (step === 'display') {
+    // No interaction — just show text + image
+    actionBtn.textContent      = 'Next Scenario'
+    actionBtn.style.visibility = 'visible'
+    actionBtn.disabled         = false
+  } else {
+    // text steps 1, 2, 3
+    actionBtn.textContent      = 'Next'
+    actionBtn.style.visibility = 'visible'
+    actionBtn.disabled         = false
+  }
+}
+
+function advanceStep() {
+  if (currentStep === 1) showStep(2)
+  else if (currentStep === 2) showStep(3)
+  else if (currentStep === 3) {
+    if      (questionMode === 'fill')    showStep('fill')
+    else if (questionMode === 'survey')  showStep('survey')
+    else                                 goNextQuestion()
+  }
+}
+
+function renderSurveyOptions() {
+  const container = document.getElementById('survey-options')
+  container.innerHTML = ''
+  const opts = (currentQ.options || []).filter(o => o.text)
+  opts.forEach(opt => {
+    const btn = document.createElement('button')
+    btn.className   = 'survey-option' + (surveySelected === opt._id ? ' selected' : '')
+    btn.textContent = opt.text
+    btn.addEventListener('click', () => {
+      if (surveySelected === opt._id) return
+      surveySelected = opt._id
+      submitQuestionResponse({ index: qIndex, option: { _id: opt._id }, duration: 0 })
+      container.querySelectorAll('.survey-option').forEach(b => b.classList.remove('selected'))
+      btn.classList.add('selected')
+      document.getElementById('action-btn').disabled = false
+    })
+    container.appendChild(btn)
+  })
+}
+
+// ═══════════════════════════════════
+// Letter pool
+// ═══════════════════════════════════
+const ALPHA = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'
+
+function buildLetterPool(gapLetters) {
+  // Always show 10 tiles: correct gap letters + unique random padding to reach 10
+  const letters  = gapLetters.split('').filter(Boolean)
+  const used     = new Set(letters)  // track letters already in pool (including correct ones)
+  const padding  = []
+  // Build a shuffled copy of the alphabet to pick from without repeats
+  const alphaPool = ALPHA.split('')
+  for (let i = alphaPool.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [alphaPool[i], alphaPool[j]] = [alphaPool[j], alphaPool[i]]
+  }
+  for (const ch of alphaPool) {
+    if (padding.length >= Math.max(0, 10 - letters.length)) break
+    if (!used.has(ch)) { padding.push(ch); used.add(ch) }
+  }
+  const all = [...letters, ...padding]
+  // Fisher-Yates shuffle
+  for (let i = all.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [all[i], all[j]] = [all[j], all[i]]
+  }
+  poolLetters = all.map((letter, i) => ({ letter, id: 'p' + i, used: false }))
+}
+
+function renderPool() {
+  const pool = document.getElementById('letter-pool')
+  pool.innerHTML = ''
+  poolLetters.forEach(item => {
+    const t = document.createElement('div')
+    t.className   = 'pool-tile' + (item.used ? ' used' : '')
+    t.textContent = item.letter.toLowerCase()
+    t.dataset.id  = item.id
+    t.addEventListener('click', () => onPoolTap(item.id))
+    pool.appendChild(t)
+  })
+}
+
+function renderSlots() {
+  const wd     = document.getElementById('word-display')
+  wd.innerHTML = ''
+  let gapIndex = 0
+
+  wordStructure.forEach(part => {
+    if (part.type === 'fixed') {
+      const el = document.createElement('div')
+      el.className   = 'fixed-letter'
+      el.textContent = part.char.toLowerCase()
+      wd.appendChild(el)
+    } else {
+      const gi  = gapIndex++
+      const pid = placedMap[gi]
+      if (pid === '__wrong__') {
+        // Gap failed — show X
+        const t = document.createElement('div')
+        t.className   = 'placed-tile wrong-placed'
+        t.textContent = '✕'
+        wd.appendChild(t)
+      } else if (pid !== undefined) {
+        const item = poolLetters.find(p => p.id === pid)
+        const t    = document.createElement('div')
+        t.className   = 'fixed-letter'
+        t.textContent = item ? item.letter.toLowerCase() : ''
+        wd.appendChild(t)
+      } else {
+        const s = document.createElement('div')
+        s.className = 'slot-empty'
+        wd.appendChild(s)
+      }
+    }
+  })
+}
+
+// Per-gap wrong attempt tracker: { gapIndex: attemptCount }
+
+function currentGapIndex() {
+  // Next unfilled gap in sequential order
+  const gapParts = wordStructure.filter(p => p.type === 'gap')
+  for (let i = 0; i < gapParts.length; i++) {
+    if (!(i in placedMap)) return i
+  }
+  return -1  // all filled
+}
+
+function ordinalLabel(n) {
+  const labels = ['first', 'second', 'third', 'fourth', 'fifth', 'sixth', 'seventh', 'eighth', 'ninth', 'tenth']
+  return labels[n] || (n + 1) + 'th'
+}
+
+function updateGapInstruction() {
+  const el      = document.getElementById('gap-instruction')
+  const gi      = currentGapIndex()
+  const gapParts = wordStructure.filter(p => p.type === 'gap')
+  if (gi === -1 || gi >= gapParts.length) { el.textContent = ''; return }
+  el.textContent = 'Select the ' + ordinalLabel(gi) + ' missing letter.'
+}
+
+async function onPoolTap(id) {
+  if (answered) return
+  const item      = poolLetters.find(p => p.id === id)
+  const gapParts  = wordStructure.filter(p => p.type === 'gap')
+  const totalGaps = gapParts.length
+  if (!item || item.used) return
+
+  const gi = currentGapIndex()
+  if (gi === -1) return
+
+  const tileEl = document.querySelector(`.pool-tile[data-id="${id}"]`)
+
+  if (item.letter.toUpperCase() !== gapParts[gi].answer.toUpperCase()) {
+    // Wrong letter for this gap
+    if (!gapAttempts[gi]) gapAttempts[gi] = 0
+    gapAttempts[gi]++
+    incorrectAttempts++
+
+    if (tileEl) {
+      tileEl.classList.add('wrong-tile')
+      setTimeout(() => tileEl.classList.remove('wrong-tile'), 500)
+    }
+
+    if (gapAttempts[gi] >= 3) {
+      // 3rd mistake — submit incorrect for this gap, mark it and move on
+      const incorrectOpt = (currentQ.options || []).find(o => !o.correct && (o.text || '').toLowerCase().replace(/\s+/g, '') !== 'usedhint')
+      if (incorrectOpt) submitQuestionResponse({ index: qIndex, option: { _id: incorrectOpt._id }, duration: 0 })
+      placedMap[gi] = '__wrong__'
+      renderSlots()
+      const allDone = Object.keys(placedMap).length === totalGaps
+      showGapFeedback(false, item.letter, () => {
+        renderPool()
+        updateGapInstruction()
+        updateHintState()
+        if (allDone) { autoSubmit(); goNextQuestion() }
+      })
+    } else {
+      showGapFeedback(false, item.letter, () => {
+        updateHintState()
+      })
+    }
+    return
+  }
+
+  // Correct letter — submit immediately for this gap
+  const hintUsedForGap = document.getElementById('hint-text').classList.contains('visible')
+  const hintOpt    = (currentQ.options || []).find(o => (o.text || '').toLowerCase().replace(/\s+/g, '') === 'usedhint')
+  const correctOpt = (currentQ.options || []).find(o => o.correct)
+  const submitOpt  = (hintUsedForGap && hintOpt) ? hintOpt : (correctOpt || (currentQ.options || [])[0])
+  if (submitOpt) submitQuestionResponse({ index: qIndex, option: { _id: submitOpt._id }, duration: 0 })
+
+  item.used = true
+  placedMap[gi] = id
+  // Reset clue for next gap
+  document.getElementById('hint-text').classList.remove('visible')
+  document.getElementById('hint-text').textContent = ''
+  document.getElementById('hint-btn').style.display = ''
+  renderSlots()
+
+  const allDone = Object.keys(placedMap).length === wordStructure.filter(p => p.type === 'gap').length
+  showGapFeedback(true, gapParts[gi].answer, () => {
+    if (allDone) {
+      autoSubmit()       // records score + submits response
+      goNextQuestion()   // immediately move to next page
+    } else {
+      renderPool()
+      updateGapInstruction()
+      updateHintState()
+    }
+  })
+}
+
+function onPlacedTap(gapIndex) {
+  if (answered) return
+  const pid  = placedMap[gapIndex]
+  const item = poolLetters.find(p => p.id === pid)
+  if (item) item.used = false
+  delete placedMap[gapIndex]
+  clearFeedback()
+  renderSlots()
+  renderPool()
+}
+
+function autoSubmit() {
+  answered = true
+  // Tally score (all gaps correct = no __wrong__ sentinels)
+  const allCorrect = !Object.values(placedMap).includes('__wrong__')
+  if (allCorrect) totalScore++
+}
+
+// submitAnswer kept as no-op stub (logic moved to onPoolTap + autoSubmit)
+function submitAnswer() {}
+
+// ═══════════════════════════════════
+// Hint
+// ═══════════════════════════════════
+function updateHintState() {
+  const btn = document.getElementById('hint-btn')
+  const gi  = currentGapIndex()
+  const attempts = (gi !== -1 && gapAttempts[gi]) ? gapAttempts[gi] : 0
+  if      (attempts === 0) btn.className = 'state-hidden'
+  else if (attempts === 1) btn.className = 'state-inactive'
+  else                     btn.className = 'state-active'
+}
+
+document.getElementById('hint-btn').addEventListener('click', function() {
+  const gi = currentGapIndex()
+  if (gi === -1) return
+  const gapParts  = wordStructure.filter(p => p.type === 'gap')
+  const letter    = gapParts[gi] ? gapParts[gi].answer.toLowerCase() : '?'
+  const label     = ordinalLabel(gi)
+  document.getElementById('hint-text').textContent = 'The ' + label + ' missing letter is "' + letter + '"'
+  document.getElementById('hint-text').classList.add('visible')
+  this.style.display = 'none'
+})
+
+// ═══════════════════════════════════
+// Feedback
+// ═══════════════════════════════════
+function showFeedback(msg, type) {
+  // No-op: feedback is now shown via showGapFeedback overlay
+}
+function clearFeedback() {
+  // No-op
+}
+
+function showGapFeedback(correct, letter, onContinue) {
+  const overlay = document.getElementById('gap-feedback')
+  const msg     = document.getElementById('gap-feedback-msg')
+  const btn     = document.getElementById('gap-feedback-btn')
+
+  msg.textContent = correct ? 'Great, this is a good answer!' : '✕ Good try! Try again.'
+  msg.className   = correct ? 'correct' : 'incorrect'
+  btn.textContent = correct ? 'Next' : 'Try Again'
+
+  // Show wrong letter in gap
+  if (!correct) renderSlotsWithFeedbackLetter(letter)
+
+  // Hide pool, clue, instruction — keep word visible
+  document.getElementById('hint-area').style.display       = 'none'
+  document.getElementById('gap-instruction').style.display = 'none'
+  document.getElementById('letter-pool').style.display     = 'none'
+  overlay.classList.remove('hidden')
+
+  btn.onclick = () => { hideGapFeedback(!correct); onContinue() }
+}
+
+// renderSlotsWithFeedbackLetter: same as renderSlots but shows the tapped letter in current gap (red)
+function renderSlotsWithFeedbackLetter(letter) {
+  const wd     = document.getElementById('word-display')
+  wd.innerHTML = ''
+  const gi     = currentGapIndex()
+  let gapIndex = 0
+
+  wordStructure.forEach(part => {
+    if (part.type === 'fixed') {
+      const el = document.createElement('div')
+      el.className   = 'fixed-letter'
+      el.textContent = part.char.toLowerCase()
+      wd.appendChild(el)
+    } else {
+      const thisGi = gapIndex++
+      const pid    = placedMap[thisGi]
+      if (pid === '__wrong__') {
+        const t = document.createElement('div')
+        t.className   = 'placed-tile wrong-placed'
+        t.textContent = '✕'
+        wd.appendChild(t)
+      } else if (pid !== undefined) {
+        const item = poolLetters.find(p => p.id === pid)
+        const t    = document.createElement('div')
+        t.className   = 'fixed-letter'
+        t.textContent = item ? item.letter.toLowerCase() : ''
+        wd.appendChild(t)
+      } else if (thisGi === gi) {
+        // This is the current gap — show the tapped (wrong) letter in red
+        const t = document.createElement('div')
+        t.className   = 'placed-tile feedback-wrong'
+        t.textContent = letter.toLowerCase()
+        wd.appendChild(t)
+      } else {
+        const s = document.createElement('div')
+        s.className = 'slot-empty'
+        wd.appendChild(s)
+      }
+    }
+  })
+}
+
+function hideGapFeedback(clearFeedbackSlot) {
+  document.getElementById('gap-feedback').classList.add('hidden')
+  document.getElementById('hint-area').style.display       = ''
+  document.getElementById('gap-instruction').style.display = ''
+  document.getElementById('letter-pool').style.display     = ''
+  // If clearing wrong feedback slot, re-render clean slots
+  if (clearFeedbackSlot) renderSlots()
+}
+
+// ═══════════════════════════════════
+// Image
+// ═══════════════════════════════════
+async function loadQuestionImage(q) {
+  const wrap = document.getElementById('question-image-wrap')
+  const img  = document.getElementById('question-image')
+  if (!q.image) { wrap.classList.remove('visible'); return }
+  try {
+    const file = await restRequest('get', 'File', q.image)
+    if (file?.url) { img.src = file.url; wrap.classList.add('visible') }
+    else wrap.classList.remove('visible')
+  } catch { wrap.classList.remove('visible') }
+}
+
+// ═══════════════════════════════════
+// Navigation
+// ═══════════════════════════════════
+function goNextQuestion() {
+  const next = qIndex + 1
+  if (next < questions.length) loadQuestion(next)
+  else showCompletion()
+}
+
+function updateProgress() {
+  const pct = questions.length > 1 ? (qIndex / (questions.length - 1)) * 100 : 0
+  document.getElementById('progress-fill').style.width = pct + '%'
+}
+
+function resetUI() {
+  clearFeedback()
+  document.getElementById('word-display').classList.remove('correct-flash', 'wrong-flash')
+  document.getElementById('action-btn').style.visibility = 'visible'
+  document.getElementById('word-display').innerHTML = ''
+  document.getElementById('letter-pool').innerHTML  = ''
+  document.getElementById('hint-btn').className     = 'state-hidden'
+  document.getElementById('hint-btn').style.display = ''
+  document.getElementById('hint-text').classList.remove('visible')
+  document.getElementById('hint-text').textContent  = ''
+  hideGapFeedback(false)
+  document.getElementById('text-block').classList.remove('visible')
+  document.getElementById('fill-area').classList.remove('visible')
+  document.getElementById('survey-area').style.display = 'none'
+  document.getElementById('survey-options').innerHTML  = ''
+  document.getElementById('divider').style.display  = 'none'
+  // Reset row visibility (row-1 set by loadQuestion after content is populated)
+  document.getElementById('row-1').style.display = 'none'
+  document.getElementById('row-1').classList.remove('survey-text')
+  document.getElementById('row-2').style.display = 'none'
+  document.getElementById('row-3').style.display = 'none'
+}
+
+function showCompletion() {
+  if (hasQuit) return
+  hasQuit = true
+  document.getElementById('progress-fill').style.width = '100%'
+  const pct = questions.length > 0 ? Math.round((totalScore / questions.length) * 100) : 0
+  postToApp('QUIT', { completeState: pct >= 60 ? 'PASS' : 'COMPLETE', customScore: pct })
+}
+
+// ═══════════════════════════════════
+// Action button
+// ═══════════════════════════════════
+document.getElementById('action-btn').addEventListener('click', function() {
+  if (currentStep === 'fill') {
+    if (answered) goNextQuestion()
+    else submitAnswer()
+  } else if (currentStep === 'survey' || currentStep === 'display') {
+    goNextQuestion()
+  } else {
+    advanceStep()
+  }
+})
+
+document.getElementById('close-btn').addEventListener('click', function() {
+  if (hasQuit) return; hasQuit = true
+  postToApp('QUIT', { completeState: 'COMPLETE' })
+})
+
+window.addEventListener('load', () => postToApp('READY_DYNAMIC_MEDIA'))
+</script>
+</body>
+</html>
