@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Bridge Debug</title>
+<style>
+body { font-family: sans-serif; background: #f5f5f5; padding: 20px; }
+h2 { font-size: 16px; margin-bottom: 12px; color: #111; }
+#log { background: #fff; border: 1px solid #ddd; border-radius: 8px; padding: 12px; font-size: 12px; line-height: 1.8; min-height: 200px; word-break: break-all; white-space: pre-wrap; }
+.ok  { color: #16a34a; }
+.err { color: #dc2626; }
+.msg { color: #1d4ed8; }
+</style>
+</head>
+<body>
+<h2>Bridge Debug</h2>
+<div id="log">Starting...\n</div>
+<script>
+var logEl = document.getElementById('log')
+
+function log(cls, text) {
+  var line = document.createElement('span')
+  line.className = cls
+  line.textContent = text + '\n'
+  logEl.appendChild(line)
+}
+
+// Global error catch
+window.onerror = function(msg, src, line, col) {
+  log('err', 'JS ERROR: ' + msg + ' line:' + line)
+  return false
+}
+
+log('ok', 'Script started')
+log('ok', 'isNative: ' + (typeof window.ReactNativeWebView !== 'undefined'))
+
+// Bridge
+var isNative = typeof window.ReactNativeWebView !== 'undefined'
+
+function postToApp(key, data) {
+  var payload = JSON.stringify({ key: key, data: data || null })
+  if (isNative) {
+    window.ReactNativeWebView.postMessage(payload)
+  } else {
+    window.parent.postMessage(payload, '*')
+  }
+}
+
+// Message listener
+function onMessage(event) {
+  try {
+    var raw = event.data
+    log('msg', 'raw type: ' + typeof raw)
+    var msg = (typeof raw === 'string') ? JSON.parse(raw) : raw
+    if (!msg || !msg.key) return
+    log('msg', 'KEY: ' + msg.key)
+    if (msg.key === 'USER') {
+      log('ok', 'USER id: ' + (msg.data && msg.data.id))
+    }
+  } catch(e) {
+    log('err', 'onMessage error: ' + e.message)
+  }
+}
+
+document.addEventListener('message', onMessage)
+window.addEventListener('message', onMessage)
+log('ok', 'Listeners registered')
+
+window.addEventListener('load', function() {
+  log('ok', 'load fired')
+  postToApp('READY_DYNAMIC_MEDIA')
+  log('ok', 'READY_DYNAMIC_MEDIA sent')
+
+  // If nothing arrives in 5s
+  setTimeout(function() {
+    log('err', 'TIMEOUT: no messages after 5s')
+  }, 5000)
+})
+</script>
+</body>
+</html>
