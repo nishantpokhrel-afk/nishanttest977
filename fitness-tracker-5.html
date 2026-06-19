@@ -1,0 +1,1115 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Fitness Tracker</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #EEF0F5;
+    --card: #FFFFFF;
+    --accent: #1B2CC1;
+    --accent-light: #4E5ED3;
+    --text-primary: #0D0F1A;
+    --text-secondary: #6B7280;
+    --text-muted: #9CA3AF;
+    --bar-inactive: #CBD5E1;
+    --bar-active: #1B2CC1;
+    --progress-track: #E2E8F0;
+    --badge-bg: #F1F2FD;
+    --workout-icon-bg: #F59E0B;
+    --radius: 14px;
+    --font: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  }
+
+  body {
+    font-family: var(--font);
+    background: var(--bg);
+    color: var(--text-primary);
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* ── LOADING SCREEN ── */
+  #loading-screen {
+    position: fixed;
+    inset: 0;
+    background: var(--bg);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 16px;
+    z-index: 999;
+  }
+  .spinner {
+    width: 36px; height: 36px;
+    border: 3px solid var(--progress-track);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  #loading-screen p { color: var(--text-secondary); font-size: 14px; }
+
+  /* ── ERROR SCREEN ── */
+  #error-screen {
+    position: fixed;
+    inset: 0;
+    background: #fff8f8;
+    display: none;
+    flex-direction: column;
+    align-items: flex-start;
+    justify-content: flex-start;
+    padding: 52px 20px 20px;
+    z-index: 998;
+    overflow-y: auto;
+  }
+  #error-screen h2 { font-size: 16px; font-weight: 800; color: #DC2626; margin-bottom: 12px; }
+  #error-screen pre {
+    font-size: 11px;
+    color: #374151;
+    background: #F3F4F6;
+    border-radius: 8px;
+    padding: 12px;
+    width: 100%;
+    white-space: pre-wrap;
+    word-break: break-all;
+    line-height: 1.6;
+  }
+  #error-dismiss {
+    margin-top: 16px;
+    background: #DC2626;
+    color: #fff;
+    border: none;
+    border-radius: 10px;
+    padding: 10px 20px;
+    font-size: 13px;
+    font-weight: 700;
+    cursor: pointer;
+    font-family: var(--font);
+  }
+
+  /* ── HEADER ── */
+  header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 52px 20px 8px;
+    background: var(--bg);
+  }
+  header h1 { font-size: 18px; font-weight: 700; }
+  #back-btn {
+    width: 36px; height: 36px;
+    border: 2px solid #CBD5E1;
+    border-radius: 50%;
+    background: none;
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    color: var(--text-primary);
+    flex-shrink: 0;
+  }
+  #back-btn svg { width: 16px; height: 16px; }
+
+  /* ── GREETING ── */
+  .greeting { padding: 20px 20px 4px; }
+  .greeting p { font-size: 14px; color: var(--text-secondary); }
+  .greeting h2 { font-size: 26px; font-weight: 800; margin-top: 2px; }
+
+  /* ── SECTION LABELS ── */
+  .section-label {
+    padding: 20px 20px 8px;
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+
+  /* ── CARDS ── */
+  .card {
+    background: var(--card);
+    border-radius: var(--radius);
+    margin: 0 16px 12px;
+    padding: 18px;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+  }
+  .card-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 16px;
+  }
+  .card-title {
+    font-size: 13px;
+    font-weight: 800;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+  }
+  .badge {
+    background: var(--badge-bg);
+    color: var(--accent);
+    font-size: 11px;
+    font-weight: 700;
+    padding: 4px 10px;
+    border-radius: 20px;
+    letter-spacing: 0.03em;
+  }
+
+  /* ── BAR CHART ── */
+  .bar-chart {
+    display: flex;
+    align-items: flex-end;
+    gap: 6px;
+    height: 90px;
+    margin-bottom: 6px;
+  }
+  .bar-col {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    height: 100%;
+  }
+  .bar-wrap {
+    flex: 1;
+    width: 100%;
+    display: flex;
+    align-items: flex-end;
+  }
+  .bar {
+    width: 100%;
+    border-radius: 4px 4px 0 0;
+    background: var(--bar-inactive);
+    min-height: 4px;
+  }
+  .bar.active { background: var(--bar-active); }
+  .bar-day { font-size: 10px; color: var(--text-muted); text-align: center; }
+  .bar-val { font-size: 9px; color: var(--text-muted); text-align: center; margin-bottom: 2px; }
+
+  /* ── STEP STATS ROW ── */
+  .stats-row {
+    display: flex;
+    border-top: 1px solid var(--progress-track);
+    padding-top: 14px;
+    margin-top: 10px;
+  }
+  .stat-item { flex: 1; text-align: center; }
+  .stat-item + .stat-item { border-left: 1px solid var(--progress-track); }
+  .stat-value { font-size: 18px; font-weight: 800; color: var(--text-primary); }
+  .stat-label { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
+
+  /* ── GOAL RING ── */
+  .goal-row {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    border-top: 1px solid var(--progress-track);
+    padding-top: 16px;
+    margin-top: 14px;
+  }
+  .ring-wrap {
+    position: relative;
+    width: 70px; height: 70px;
+    flex-shrink: 0;
+  }
+  .ring-wrap svg { width: 70px; height: 70px; }
+  .ring-label {
+    position: absolute;
+    inset: 0;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 13px;
+    font-weight: 800;
+    color: var(--accent);
+  }
+  .goal-info { flex: 1; }
+  .goal-main { font-size: 24px; font-weight: 900; color: var(--accent); }
+  .goal-sub { font-size: 12px; color: var(--text-secondary); margin-top: 2px; }
+  .goal-yesterday { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
+  .btn-outline {
+    display: inline-block;
+    margin-top: 8px;
+    border: 1.5px solid var(--text-secondary);
+    border-radius: 20px;
+    padding: 5px 14px;
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--text-secondary);
+    letter-spacing: 0.04em;
+    cursor: pointer;
+    background: none;
+    text-transform: uppercase;
+  }
+
+  /* ── CALORIES ── */
+  .calories-big {
+    font-size: 56px;
+    font-weight: 900;
+    color: var(--accent);
+    line-height: 1;
+    margin-bottom: 4px;
+  }
+  .calories-unit { font-size: 13px; color: var(--text-secondary); margin-bottom: 12px; }
+  .progress-bar-wrap {
+    height: 8px;
+    background: var(--progress-track);
+    border-radius: 4px;
+    overflow: hidden;
+    margin-bottom: 10px;
+  }
+  .progress-bar-fill {
+    height: 100%;
+    background: var(--accent);
+    border-radius: 4px;
+    transition: width 0.5s ease;
+  }
+  .target-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 14px;
+  }
+  .target-row span { font-size: 12px; color: var(--text-secondary); }
+  .cal-breakdown {
+    display: flex;
+    gap: 24px;
+    padding-top: 14px;
+    border-top: 1px solid var(--progress-track);
+  }
+  .cal-item-label {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+  }
+  .cal-item-value { font-size: 22px; font-weight: 900; color: var(--text-primary); }
+  .cal-item-unit { font-size: 12px; color: var(--text-muted); font-weight: 600; }
+
+  /* ── WORKOUTS ── */
+  .workouts-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 4px 0 12px;
+  }
+  .workouts-title { font-size: 15px; font-weight: 700; }
+  .workouts-count { font-size: 13px; color: var(--text-secondary); }
+  .workout-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 0;
+    border-top: 1px solid var(--progress-track);
+  }
+  .workout-icon {
+    width: 40px; height: 40px;
+    border-radius: 10px;
+    background: var(--workout-icon-bg);
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+    font-size: 18px;
+  }
+  .workout-name { font-size: 14px; font-weight: 600; flex: 1; }
+  .workout-duration { font-size: 14px; font-weight: 700; }
+  .empty-state { text-align: center; padding: 24px 0; color: var(--text-muted); font-size: 13px; }
+
+  /* ── BOTTOM SHEET ── */
+  .scrim {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.4);
+    z-index: 100;
+    display: none;
+    opacity: 0;
+    transition: opacity 0.2s ease;
+  }
+  .scrim.visible { display: block; }
+  .scrim.active { opacity: 1; }
+
+  .bottom-sheet {
+    position: fixed;
+    bottom: 0; left: 0; right: 0;
+    background: var(--card);
+    border-radius: 20px 20px 0 0;
+    padding: 24px 20px 40px;
+    z-index: 101;
+    transform: translateY(100%);
+    transition: transform 0.28s ease;
+  }
+  .bottom-sheet.active { transform: translateY(0); }
+
+  .sheet-handle {
+    width: 36px; height: 4px;
+    background: var(--progress-track);
+    border-radius: 2px;
+    margin: 0 auto 20px;
+  }
+  .sheet-title {
+    font-size: 17px;
+    font-weight: 800;
+    margin-bottom: 6px;
+  }
+  .sheet-subtitle {
+    font-size: 13px;
+    color: var(--text-secondary);
+    margin-bottom: 20px;
+  }
+  .sheet-input {
+    width: 100%;
+    border: 1.5px solid var(--progress-track);
+    border-radius: 10px;
+    padding: 12px 14px;
+    font-size: 20px;
+    font-weight: 700;
+    color: var(--text-primary);
+    font-family: var(--font);
+    outline: none;
+    margin-bottom: 16px;
+    -webkit-appearance: none;
+  }
+  .sheet-input:focus { border-color: var(--accent); }
+  .sheet-save {
+    width: 100%;
+    background: var(--accent);
+    color: #fff;
+    border: none;
+    border-radius: 12px;
+    padding: 14px;
+    font-size: 15px;
+    font-weight: 700;
+    cursor: pointer;
+    font-family: var(--font);
+  }
+  .sheet-save:disabled { opacity: 0.5; }
+  .sheet-error {
+    font-size: 12px;
+    color: #DC2626;
+    margin-top: -8px;
+    margin-bottom: 12px;
+    display: none;
+  }
+
+  .scroll-pad { height: 32px; }
+  #main-content { display: none; }
+</style>
+</head>
+<body>
+
+<!-- Loading -->
+<div id="loading-screen">
+  <div class="spinner"></div>
+  <p>Loading your fitness data…</p>
+</div>
+
+<!-- Error screen -->
+<div id="error-screen">
+  <h2>Debug Error</h2>
+  <pre id="error-log"></pre>
+  <button id="error-dismiss" onclick="document.getElementById('error-screen').style.display='none'">Dismiss</button>
+</div>
+
+<!-- Main content -->
+<div id="main-content">
+  <header>
+    <h1>Fitness Tracker</h1>
+    <button id="back-btn" aria-label="Close">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+        <polyline points="15 18 9 12 15 6"></polyline>
+      </svg>
+    </button>
+  </header>
+
+  <div class="greeting">
+    <p>Hi,</p>
+    <h2 id="display-name">There</h2>
+  </div>
+
+  <!-- STEPS -->
+  <div class="section-label">Steps</div>
+  <div class="card">
+    <div class="card-header">
+      <span class="card-title">Steps Activity</span>
+      <span class="badge">Last 7 Days</span>
+    </div>
+    <div class="bar-chart" id="bar-chart"></div>
+    <div class="stats-row">
+      <div class="stat-item">
+        <div class="stat-value" id="weekly-avg">—</div>
+        <div class="stat-label">Weekly Avg</div>
+      </div>
+      <div class="stat-item">
+        <div class="stat-value" id="best-day">—</div>
+        <div class="stat-label">Best Day</div>
+      </div>
+      <div class="stat-item">
+        <div class="stat-value" id="weekly-total">—</div>
+        <div class="stat-label">Weekly Total</div>
+      </div>
+    </div>
+    <div class="goal-row">
+      <div class="ring-wrap">
+        <svg viewBox="0 0 70 70">
+          <circle cx="35" cy="35" r="28" fill="none" stroke="#E2E8F0" stroke-width="7"/>
+          <circle id="ring-fill" cx="35" cy="35" r="28" fill="none" stroke="#1B2CC1" stroke-width="7"
+            stroke-linecap="round"
+            stroke-dasharray="175.93"
+            stroke-dashoffset="175.93"
+            transform="rotate(-90 35 35)"
+          />
+        </svg>
+        <div class="ring-label" id="ring-pct">0%</div>
+      </div>
+      <div class="goal-info">
+        <div class="goal-main"><span id="today-steps">—</span> / <span id="step-goal">—</span></div>
+        <div class="goal-sub" id="steps-to-goal">— steps to goal</div>
+        <div class="goal-yesterday" id="yesterday-steps">Yesterday: —</div>
+        <button class="btn-outline" id="set-goal-btn">Set Goal</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- FITNESS -->
+  <div class="section-label">Fitness</div>
+  <div class="card">
+    <div class="card-header">
+      <span class="card-title">Calories Burn</span>
+      <span class="badge">Today</span>
+    </div>
+    <div class="calories-big" id="cal-total">—</div>
+    <div class="calories-unit">kcal calories burned today</div>
+    <div class="progress-bar-wrap">
+      <div class="progress-bar-fill" id="cal-progress" style="width:0%"></div>
+    </div>
+    <div class="target-row">
+      <span id="cal-target-label">Target: — kcal</span>
+      <button class="btn-outline" id="set-target-btn">Set Target</button>
+    </div>
+    <div class="cal-breakdown">
+      <div class="cal-item">
+        <div class="cal-item-label">Active</div>
+        <div><span class="cal-item-value" id="active-cal">—</span> <span class="cal-item-unit">KCAL</span></div>
+      </div>
+      <div class="cal-item">
+        <div class="cal-item-label">Basal</div>
+        <div><span class="cal-item-value" id="basal-cal">—</span> <span class="cal-item-unit">KCAL</span></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="workouts-header">
+      <span class="workouts-title">Workouts</span>
+      <span class="workouts-count" id="workouts-count">This week — 0 Sessions</span>
+    </div>
+    <div id="workout-list"></div>
+  </div>
+
+  <div class="scroll-pad"></div>
+</div>
+
+<!-- Scrim -->
+<div class="scrim" id="scrim"></div>
+
+<!-- Goal bottom sheet -->
+<div class="bottom-sheet" id="sheet-goal">
+  <div class="sheet-handle"></div>
+  <div class="sheet-title">Set Daily Step Goal</div>
+  <div class="sheet-subtitle">Enter the number of steps you want to reach each day.</div>
+  <input class="sheet-input" id="input-step-goal" type="number" inputmode="numeric" placeholder="e.g. 10000" min="1" max="99999">
+  <div class="sheet-error" id="error-step-goal">Please enter a valid number of steps.</div>
+  <button class="sheet-save" id="save-goal-btn">Save Goal</button>
+</div>
+
+<!-- Target bottom sheet -->
+<div class="bottom-sheet" id="sheet-target">
+  <div class="sheet-handle"></div>
+  <div class="sheet-title">Set Calorie Target</div>
+  <div class="sheet-subtitle">Enter your daily calorie burn target in kcal.</div>
+  <input class="sheet-input" id="input-cal-target" type="number" inputmode="numeric" placeholder="e.g. 2500" min="1" max="99999">
+  <div class="sheet-error" id="error-cal-target">Please enter a valid calorie target.</div>
+  <button class="sheet-save" id="save-target-btn">Save Target</button>
+</div>
+
+<script>
+// ─────────────────────────────────────────────
+// Error display — catches JS errors AND boot
+// timeout so something visible always shows
+// on device when things go wrong.
+// ─────────────────────────────────────────────
+var _errorLines = []
+
+function showError(label, detail) {
+  _errorLines.push('[' + label + '] ' + String(detail))
+  var screen = document.getElementById('error-screen')
+  var log    = document.getElementById('error-log')
+  if (screen && log) {
+    log.textContent = _errorLines.join('\n')
+    screen.style.display = 'flex'
+  }
+  // Also send to Cogniss debug console
+  try {
+    if (typeof window.ReactNativeWebView !== 'undefined') {
+      window.ReactNativeWebView.postMessage(JSON.stringify({ key: 'LOG', data: 'ERROR: ' + label + ' — ' + String(detail) }))
+    }
+  } catch(e2) {}
+}
+
+// Catch any uncaught JS parse/runtime error
+window.onerror = function(msg, src, line, col, err) {
+  showError('window.onerror', msg + ' (line ' + line + ':' + col + ')')
+  return false
+}
+
+// ─────────────────────────────────────────────
+// Bridge
+// ─────────────────────────────────────────────
+var isNative = typeof window.ReactNativeWebView !== 'undefined'
+
+function postToApp(key, data) {
+  var text = JSON.stringify({ key: key, data: data || null })
+  if (isNative) {
+    window.ReactNativeWebView.postMessage(text)
+  } else {
+    window.parent.postMessage(text, '*')
+  }
+}
+
+// ─────────────────────────────────────────────
+// REST request with 10s timeout (Bug #5)
+// ─────────────────────────────────────────────
+var _reqId = 0
+var _pending = {}
+
+function restRequest(method, model, data, specialParams) {
+  return new Promise(function(resolve, reject) {
+    var id = 'req-' + (++_reqId)
+    var timer = setTimeout(function() {
+      if (_pending[id]) {
+        delete _pending[id]
+        reject(new Error('timeout:' + model))
+      }
+    }, 10000)
+    _pending[id] = {
+      resolve: function(v) { clearTimeout(timer); resolve(v) },
+      reject:  function(e) { clearTimeout(timer); reject(e)  }
+    }
+    postToApp('REST_REQUEST', {
+      method: method,
+      model: model,
+      data: data || {},
+      id: id,
+      specialParams: specialParams || null
+    })
+  })
+}
+
+// ─────────────────────────────────────────────
+// State & boot
+// REQUIRED = USER only (Bug #1).
+// QUESTIONS is stored opportunistically — on
+// mobile it may arrive after USER, so we never
+// block boot on it. We look up question IDs
+// by label whenever they're needed; if QUESTIONS
+// hasn't arrived yet we fall back gracefully.
+// ─────────────────────────────────────────────
+var state = {}
+// Plain objects instead of Set — older Android WebViews don't support ES6 Set
+var REQUIRED = { USER: true }
+var received = {}
+var _initStarted = false
+
+// Bug #4: guard typeof before JSON.parse
+function onMessage(event) {
+  try {
+    var message = (typeof event.data === 'string') ? JSON.parse(event.data) : event.data
+    if (!message || !message.key) return
+    handleMessage(message)
+  } catch(e) {}
+}
+
+// Bug #6: register BEFORE sending READY_DYNAMIC_MEDIA
+document.addEventListener('message', onMessage)
+window.addEventListener('message', onMessage)
+
+function handleMessage(msg) {
+  if (msg.key === 'REQUEST_RESPONSE') {
+    var p = _pending[msg.data && msg.data.id]
+    if (p) {
+      delete _pending[msg.data.id]
+      if (msg.data.error) {
+        p.reject(new Error(msg.data.error))
+      } else {
+        p.resolve(msg.data.result || msg.data)
+      }
+    }
+    return
+  }
+
+  state[msg.key] = msg.data
+
+  if (REQUIRED[msg.key]) {
+    received[msg.key] = true
+  }
+
+  // Bug #3: strict key check only
+  if (received.USER) {
+    if (!_initStarted) {
+      _initStarted = true
+      try {
+        init()
+      } catch(e) {
+        showError('init-crash', e.message || String(e))
+      }
+    }
+  }
+}
+
+window.addEventListener('load', function() {
+  postToApp('READY_DYNAMIC_MEDIA')
+
+  // Boot timeout — if USER never arrives within 8s, show what we received
+  setTimeout(function() {
+    if (!_initStarted) {
+      showError('boot-timeout', 'USER not received after 8s. Keys received: ' + JSON.stringify(Object.keys(state)))
+    }
+  }, 8000)
+
+  // Bug #2: standalone fallback only outside Cogniss
+  if (!isNative && window.parent === window) {
+    setTimeout(function() {
+      if (!_initStarted) {
+        _initStarted = true
+        state.USER = { id: 'preview', displayName: 'Preview User' }
+        // Stub questions so goal saving works in browser preview
+        if (!state.QUESTIONS) {
+          state.QUESTIONS = [
+            { _id: 'q_step_goal',  label: 'step_goal',  type: 'SHORT_TEXT' },
+            { _id: 'q_cal_target', label: 'cal_target', type: 'SHORT_TEXT' }
+          ]
+        }
+        init()
+      }
+    }, 800)
+  }
+})
+
+// ─────────────────────────────────────────────
+// Question helpers
+// Find question by label — template expects two
+// SHORT_TEXT questions labelled 'step_goal' and
+// 'cal_target' in the Topic.
+// ─────────────────────────────────────────────
+var DEFAULT_STEP_GOAL = 10000
+var DEFAULT_CAL_TARGET = 2500
+
+function getQuestion(label) {
+  var questions = state.QUESTIONS || []
+  for (var i = 0; i < questions.length; i++) {
+    if (questions[i].label === label) return questions[i]
+  }
+  return null
+}
+
+function getQuestionIndex(label) {
+  var questions = state.QUESTIONS || []
+  for (var i = 0; i < questions.length; i++) {
+    if (questions[i].label === label) return i
+  }
+  return -1
+}
+
+// ─────────────────────────────────────────────
+// Load prior saved answers for both goals.
+// Queries by activity + user + label so we
+// don't need state.QUESTIONS to have arrived
+// yet — safe on mobile where QUESTIONS comes
+// after USER.
+// ─────────────────────────────────────────────
+function loadSavedGoals() {
+  var userId     = state.USER && state.USER.id
+  var activityId = state.ACTIVITY && state.ACTIVITY.id
+
+  if (!userId || !activityId) {
+    return Promise.resolve({ stepGoal: DEFAULT_STEP_GOAL, calTarget: DEFAULT_CAL_TARGET })
+  }
+
+  var stepP = restRequest('list', 'QuestionResponse', {
+    activity: activityId,
+    user: userId,
+    label: 'step_goal',
+    sort: '-date',
+    limit: 1
+  }).catch(function() { return { items: [] } })
+
+  var calP = restRequest('list', 'QuestionResponse', {
+    activity: activityId,
+    user: userId,
+    label: 'cal_target',
+    sort: '-date',
+    limit: 1
+  }).catch(function() { return { items: [] } })
+
+  return Promise.all([stepP, calP]).then(function(results) {
+    var stepVal = DEFAULT_STEP_GOAL
+    var calVal  = DEFAULT_CAL_TARGET
+
+    var stepItems = (results[0] && results[0].items) ? results[0].items : []
+    if (stepItems.length > 0 && stepItems[0].text) {
+      var parsedStep = parseInt(stepItems[0].text)
+      if (!isNaN(parsedStep) && parsedStep > 0) stepVal = parsedStep
+    }
+
+    var calItems = (results[1] && results[1].items) ? results[1].items : []
+    if (calItems.length > 0 && calItems[0].text) {
+      var parsedCal = parseInt(calItems[0].text)
+      if (!isNaN(parsedCal) && parsedCal > 0) calVal = parsedCal
+    }
+
+    return { stepGoal: stepVal, calTarget: calVal }
+  })
+}
+
+// ─────────────────────────────────────────────
+// Save a goal via QUESTION_RESPONSE
+// ─────────────────────────────────────────────
+function saveGoal(label, value) {
+  var idx = getQuestionIndex(label)
+  if (idx === -1) return
+  postToApp('QUESTION_RESPONSE', {
+    index: idx,
+    text: String(value),
+    duration: 0
+  })
+  postToApp('LOG', 'Saved ' + label + ' = ' + value)
+}
+
+// ─────────────────────────────────────────────
+// Init
+// ─────────────────────────────────────────────
+var _currentStepGoal = DEFAULT_STEP_GOAL
+var _currentCalTarget = DEFAULT_CAL_TARGET
+var _currentSteps = 0
+var _currentActiveCal = 0
+var _currentBasalCal = 0
+
+function init() {
+  var user = state.USER || {}
+  document.getElementById('display-name').textContent = user.displayName || user.firstName || 'There'
+  document.getElementById('loading-screen').style.display = 'none'
+  document.getElementById('main-content').style.display = 'block'
+
+  // Load saved goals first, then health data using those goals (Bug #8: independent try/catch)
+  loadSavedGoals().then(function(goals) {
+    _currentStepGoal  = goals.stepGoal
+    _currentCalTarget = goals.calTarget
+
+    return Promise.all([
+      loadSteps(user, _currentStepGoal),
+      loadCalories(user, _currentCalTarget),
+      loadWorkouts(user)
+    ])
+  }).then(function() {
+    postToApp('LOG', 'Fitness Tracker: all data loaded')
+  }).catch(function(err) {
+    postToApp('LOG', 'Fitness Tracker: load error — ' + err.message)
+  })
+}
+
+// ─────────────────────────────────────────────
+// Steps
+// ─────────────────────────────────────────────
+function loadSteps(user, stepGoal) {
+  return restRequest('list', 'AppleHealthRecord', {
+    user: user.id,
+    type: 'STEP_COUNT',
+    sort: '-start',
+    limit: 8
+  }).then(function(result) {
+    var records = (result && result.items) ? result.items : []
+    renderSteps(records, stepGoal)
+  }).catch(function() {
+    renderSteps([], stepGoal)
+  })
+}
+
+function renderSteps(records, stepGoal) {
+  var days = ['M','T','W','T','F','S','S']
+  var today = new Date()
+  var dayData = []
+
+  for (var i = 6; i >= 0; i--) {
+    var d = new Date(today)
+    d.setDate(today.getDate() - i)
+    var label = days[d.getDay() === 0 ? 6 : d.getDay() - 1]
+    var rec = null
+    for (var r = 0; r < records.length; r++) {
+      if (new Date(records[r].start).toDateString() === d.toDateString()) {
+        rec = records[r]; break
+      }
+    }
+    dayData.push({ label: label, value: rec ? Math.round(rec.value) : 0, isToday: (i === 0) })
+  }
+
+  if (records.length > 0 && dayData.every(function(d) { return d.value === 0 })) {
+    for (var i = 0; i < Math.min(records.length, 7); i++) {
+      dayData[6 - i].value = Math.round(records[i].value)
+    }
+  }
+
+  var values = dayData.map(function(d) { return d.value })
+  var max    = Math.max.apply(null, values.concat([1]))
+  var total  = values.reduce(function(a, b) { return a + b }, 0)
+  var avg    = Math.round(total / 7)
+  var best   = Math.max.apply(null, values)
+  var todaySteps = dayData[dayData.length - 1].value
+  _currentSteps = todaySteps
+
+  var chartEl = document.getElementById('bar-chart')
+  chartEl.innerHTML = ''
+  dayData.forEach(function(d) {
+    var heightPct = max > 0 ? Math.round((d.value / max) * 85) + 15 : 15
+    var isActive  = d.isToday || d.value === best
+    var col = document.createElement('div')
+    col.className = 'bar-col'
+    col.innerHTML =
+      '<div class="bar-wrap"><div class="bar' + (isActive ? ' active' : '') +
+      '" style="height:' + heightPct + '%"></div></div>' +
+      '<div class="bar-day">' + d.label + '</div>' +
+      '<div class="bar-val">' + (d.value > 0 ? fmtNum(d.value) : '') + '</div>'
+    chartEl.appendChild(col)
+  })
+
+  document.getElementById('weekly-avg').textContent   = fmtNum(avg)
+  document.getElementById('best-day').textContent     = fmtNum(best)
+  document.getElementById('weekly-total').textContent = fmtNum(total)
+
+  updateStepGoalDisplay(todaySteps, stepGoal)
+
+  var yesterdaySteps = dayData.length >= 2 ? dayData[dayData.length - 2].value : 0
+  var diff = (todaySteps > 0 && yesterdaySteps > 0)
+    ? Math.round(((todaySteps - yesterdaySteps) / yesterdaySteps) * 100)
+    : null
+  document.getElementById('yesterday-steps').textContent = diff !== null
+    ? 'Yesterday: ' + fmtNum(yesterdaySteps) + '  ' + (diff >= 0 ? diff + '% up' : Math.abs(diff) + '% down')
+    : 'Yesterday: ' + fmtNum(yesterdaySteps)
+}
+
+function updateStepGoalDisplay(todaySteps, stepGoal) {
+  document.getElementById('today-steps').textContent  = fmtNum(todaySteps)
+  document.getElementById('step-goal').textContent    = fmtNum(stepGoal)
+  document.getElementById('steps-to-goal').textContent = fmtNum(Math.max(0, stepGoal - todaySteps)) + ' steps to goal'
+
+  var pct          = Math.min(1, stepGoal > 0 ? todaySteps / stepGoal : 0)
+  var circumference = 175.93
+  document.getElementById('ring-fill').style.strokeDashoffset = circumference - (circumference * pct)
+  document.getElementById('ring-pct').textContent = Math.round(pct * 100) + '%'
+}
+
+// ─────────────────────────────────────────────
+// Calories
+// ─────────────────────────────────────────────
+function loadCalories(user, calTarget) {
+  var today = new Date()
+  today.setHours(0, 0, 0, 0)
+
+  var activeP = restRequest('list', 'AppleHealthRecord', {
+    user: user.id, type: 'ACTIVE_ENERGY_BURNED', sort: '-start', limit: 50
+  }).catch(function() { return { items: [] } })
+
+  var basalP = restRequest('list', 'AppleHealthRecord', {
+    user: user.id, type: 'BASAL_ENERGY_BURNED', sort: '-start', limit: 50
+  }).catch(function() { return { items: [] } })
+
+  return Promise.all([activeP, basalP]).then(function(results) {
+    var activeRecs = (results[0] && results[0].items) ? results[0].items : []
+    var basalRecs  = (results[1] && results[1].items) ? results[1].items : []
+
+    var activeCal = activeRecs
+      .filter(function(r) { return new Date(r.start) >= today })
+      .reduce(function(s, r) { return s + (r.value || 0) }, 0)
+
+    var basalCal = basalRecs
+      .filter(function(r) { return new Date(r.start) >= today })
+      .reduce(function(s, r) { return s + (r.value || 0) }, 0)
+
+    _currentActiveCal = Math.round(activeCal)
+    _currentBasalCal  = Math.round(basalCal)
+
+    document.getElementById('active-cal').textContent = _currentActiveCal
+    document.getElementById('basal-cal').textContent  = _currentBasalCal
+
+    updateCalTargetDisplay(_currentActiveCal + _currentBasalCal, calTarget)
+  })
+}
+
+function updateCalTargetDisplay(total, calTarget) {
+  document.getElementById('cal-total').textContent       = fmtNum(Math.round(total))
+  document.getElementById('cal-target-label').textContent = 'Target: ' + fmtNum(calTarget) + ' kcal'
+  var pct = Math.min(100, calTarget > 0 ? Math.round((total / calTarget) * 100) : 0)
+  document.getElementById('cal-progress').style.width = pct + '%'
+}
+
+// ─────────────────────────────────────────────
+// Workouts
+// ─────────────────────────────────────────────
+var WORKOUT_ICONS = {
+  'Running': '🏃', 'Cycling': '🚴', 'Swimming': '🏊',
+  'Walking': '🚶', 'Yoga': '🧘', 'Strength': '🏋️',
+  'HIIT': '⚡', 'default': '💪'
+}
+
+function loadWorkouts(user) {
+  var weekStart = new Date()
+  weekStart.setDate(weekStart.getDate() - 7)
+  weekStart.setHours(0, 0, 0, 0)
+
+  return restRequest('list', 'AppleHealthRecord', {
+    user: user.id, type: 'WORKOUT', sort: '-start', limit: 20
+  }).then(function(result) {
+    var all = (result && result.items) ? result.items : []
+    renderWorkouts(all.filter(function(r) { return new Date(r.start) >= weekStart }))
+  }).catch(function() {
+    renderWorkouts([])
+  })
+}
+
+function renderWorkouts(workouts) {
+  document.getElementById('workouts-count').textContent =
+    'This week — ' + workouts.length + ' Session' + (workouts.length !== 1 ? 's' : '')
+
+  var listEl = document.getElementById('workout-list')
+  listEl.innerHTML = ''
+
+  if (workouts.length === 0) {
+    listEl.innerHTML = '<div class="empty-state">No workouts recorded this week</div>'
+    return
+  }
+
+  workouts.forEach(function(w) {
+    var name = w.activityName || 'Workout'
+    var icon = WORKOUT_ICONS[name] || WORKOUT_ICONS['default']
+    var dur  = (w.start && w.end) ? Math.round((new Date(w.end) - new Date(w.start)) / 60000) : 0
+    var item = document.createElement('div')
+    item.className = 'workout-item'
+    item.innerHTML =
+      '<div class="workout-icon">' + icon + '</div>' +
+      '<div class="workout-name">' + escHtml(name) + '</div>' +
+      '<div class="workout-duration">' + dur + ' min</div>'
+    listEl.appendChild(item)
+  })
+}
+
+// ─────────────────────────────────────────────
+// Bottom sheet helpers (Bug #8: position:fixed)
+// ─────────────────────────────────────────────
+var _activeSheet = null
+
+function openSheet(sheetId) {
+  var scrim = document.getElementById('scrim')
+  var sheet = document.getElementById(sheetId)
+  _activeSheet = sheetId
+
+  scrim.style.display = 'block'
+  // trigger reflow then animate
+  scrim.offsetHeight
+  scrim.classList.add('active')
+  sheet.classList.add('active')
+}
+
+function closeSheet() {
+  var scrim = document.getElementById('scrim')
+  var sheet = _activeSheet ? document.getElementById(_activeSheet) : null
+  if (sheet) sheet.classList.remove('active')
+  scrim.classList.remove('active')
+  setTimeout(function() { scrim.style.display = 'none' }, 200)
+  _activeSheet = null
+}
+
+document.getElementById('scrim').addEventListener('click', closeSheet)
+
+// ─────────────────────────────────────────────
+// Set Goal sheet
+// ─────────────────────────────────────────────
+document.getElementById('set-goal-btn').addEventListener('click', function() {
+  var input = document.getElementById('input-step-goal')
+  input.value = _currentStepGoal
+  document.getElementById('error-step-goal').style.display = 'none'
+  openSheet('sheet-goal')
+  setTimeout(function() { input.focus() }, 300)
+})
+
+document.getElementById('save-goal-btn').addEventListener('click', function() {
+  var input  = document.getElementById('input-step-goal')
+  var errEl  = document.getElementById('error-step-goal')
+  var val    = parseInt(input.value)
+
+  if (isNaN(val) || val < 1 || val > 99999) {
+    errEl.style.display = 'block'
+    return
+  }
+  errEl.style.display = 'none'
+
+  _currentStepGoal = val
+  saveGoal('step_goal', val)
+  updateStepGoalDisplay(_currentSteps, val)
+  closeSheet()
+})
+
+// ─────────────────────────────────────────────
+// Set Target sheet
+// ─────────────────────────────────────────────
+document.getElementById('set-target-btn').addEventListener('click', function() {
+  var input = document.getElementById('input-cal-target')
+  input.value = _currentCalTarget
+  document.getElementById('error-cal-target').style.display = 'none'
+  openSheet('sheet-target')
+  setTimeout(function() { input.focus() }, 300)
+})
+
+document.getElementById('save-target-btn').addEventListener('click', function() {
+  var input = document.getElementById('input-cal-target')
+  var errEl = document.getElementById('error-cal-target')
+  var val   = parseInt(input.value)
+
+  if (isNaN(val) || val < 1 || val > 99999) {
+    errEl.style.display = 'block'
+    return
+  }
+  errEl.style.display = 'none'
+
+  _currentCalTarget = val
+  saveGoal('cal_target', val)
+  updateCalTargetDisplay(_currentActiveCal + _currentBasalCal, val)
+  closeSheet()
+})
+
+// ─────────────────────────────────────────────
+// Back / close — Bug #7
+// ─────────────────────────────────────────────
+document.getElementById('back-btn').addEventListener('click', function() {
+  postToApp('QUIT', { completeState: 'COMPLETE' })
+})
+
+// ─────────────────────────────────────────────
+// Helpers
+// ─────────────────────────────────────────────
+function fmtNum(n) {
+  if (n === null || n === undefined) return '—'
+  var num = typeof n === 'string' ? parseInt(n) : Math.round(n)
+  if (isNaN(num)) return '—'
+  return num.toLocaleString()
+}
+
+function escHtml(str) {
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+}
+</script>
+</body>
+</html>
