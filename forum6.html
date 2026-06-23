@@ -1,0 +1,925 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Forum</title>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --primary: #111111;
+  --primary-dark: #333333;
+  --primary-text: #ffffff;
+  --topbar-bg: #ffffff;
+  --topbar-border: #f0f0f0;
+  --radius: 8px;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  background: #ffffff;
+  color: #1a1a1a;
+  min-height: 100vh;
+  padding: 100px 0 100px;
+}
+
+/* ── Top bar ── */
+.topbar {
+  position: fixed;
+  top: 0; left: 0; right: 0;
+  height: 100px;
+  background: var(--topbar-bg);
+  border-bottom: 1px solid var(--topbar-border);
+  display: flex;
+  align-items: flex-end;
+  padding-bottom: 14px;
+  z-index: 100;
+}
+.topbar-inner {
+  max-width: 640px;
+  margin: 0 auto;
+  width: 100%;
+  padding: 0 20px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+.back-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: none;
+  border: 1px solid #e5e5e5;
+  border-radius: var(--radius);
+  padding: 7px 12px;
+  font-size: 13px;
+  font-weight: 500;
+  color: #555;
+  cursor: pointer;
+  font-family: inherit;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.back-btn:hover { background: #f7f7f7; }
+.topbar-title {
+  font-size: 17px;
+  font-weight: 700;
+  color: #111;
+  letter-spacing: -0.3px;
+}
+
+/* ── Bottom fade ── */
+.bottombar {
+  position: fixed;
+  bottom: 0; left: 0; right: 0;
+  height: 100px;
+  background: linear-gradient(to top, #fff 60%, transparent);
+  pointer-events: none;
+  z-index: 50;
+}
+
+/* ── Shell ── */
+.shell {
+  max-width: 640px;
+  margin: 0 auto;
+  padding: 24px 20px 0;
+}
+
+/* ── Compose ── */
+.compose {
+  background: #fafafa;
+  border: 1px solid #ebebeb;
+  border-radius: 14px;
+  padding: 16px;
+  margin-bottom: 24px;
+}
+.compose-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+.avatar {
+  width: 36px; height: 36px;
+  border-radius: 50%;
+  background: #e8e8e8;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 13px; font-weight: 600;
+  color: #fff;
+  flex-shrink: 0;
+  text-transform: uppercase;
+}
+.avatar.sm { width: 28px; height: 28px; font-size: 11px; }
+.compose-name { font-size: 13px; font-weight: 600; color: #111; }
+.compose textarea {
+  width: 100%;
+  border: none;
+  background: transparent;
+  resize: none;
+  font-size: 14px;
+  line-height: 1.5;
+  color: #222;
+  outline: none;
+  min-height: 64px;
+  font-family: inherit;
+}
+.compose textarea::placeholder { color: #bbb; }
+.compose-footer {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 10px;
+}
+.error-msg { color: #d44; font-size: 13px; }
+
+/* ── Buttons ── */
+.btn-post, .btn-comment {
+  background: var(--primary);
+  color: var(--primary-text);
+  border: none;
+  border-radius: var(--radius);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: inherit;
+  transition: opacity 0.15s;
+}
+.btn-post { padding: 8px 18px; }
+.btn-comment { padding: 8px 14px; font-size: 12px; white-space: nowrap; flex-shrink: 0; }
+.btn-post:hover, .btn-comment:hover { opacity: 0.85; }
+.btn-post:disabled, .btn-comment:disabled { opacity: 0.35; cursor: not-allowed; }
+
+/* ── Feed ── */
+.feed { display: flex; flex-direction: column; gap: 16px; }
+
+/* ── Post card ── */
+.post-card {
+  background: #fff;
+  border: 1px solid #ebebeb;
+  border-radius: 14px;
+  padding: 18px 18px 14px;
+}
+.post-meta {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+.post-author { font-size: 13px; font-weight: 600; color: #111; }
+.post-time { font-size: 12px; color: #aaa; margin-left: auto; }
+.post-body { font-size: 14px; line-height: 1.6; color: #333; margin-bottom: 14px; word-break: break-word; }
+.post-body a, .comment-body a { color: #6366f1; text-decoration: underline; text-underline-offset: 2px; word-break: break-all; }
+
+/* ── Actions ── */
+.post-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  border-top: 1px solid #f3f3f3;
+  padding-top: 12px;
+}
+.action-btn {
+  display: flex; align-items: center; gap: 5px;
+  background: none; border: none;
+  padding: 6px 10px; border-radius: var(--radius);
+  font-size: 13px; color: #888;
+  cursor: pointer; font-family: inherit;
+}
+.action-btn:hover { background: #f5f5f5; color: #333; }
+.action-btn.liked { color: #e03e3e; }
+.delete-post-btn { margin-left: auto; }
+.delete-post-btn:hover { background: #fff0f0; color: #e03e3e; }
+
+/* ── Comments ── */
+.comments-section { margin-top: 14px; display: none; flex-direction: column; }
+.comments-section.open { display: flex; }
+.comment-list { display: flex; flex-direction: column; gap: 10px; margin-bottom: 12px; }
+.comment-item { display: flex; gap: 9px; align-items: flex-start; }
+.comment-bubble { background: #f7f7f7; border-radius: 10px; padding: 8px 11px; flex: 1; }
+.comment-author { font-size: 12px; font-weight: 600; color: #111; margin-bottom: 2px; }
+.comment-body { font-size: 13px; color: #444; line-height: 1.45; word-break: break-word; }
+.comment-time { font-size: 11px; color: #bbb; margin-top: 3px; }
+.comment-delete-btn {
+  background: none; border: none;
+  padding: 4px; border-radius: 6px;
+  cursor: pointer; color: #ddd;
+  flex-shrink: 0; align-self: flex-start; margin-top: 6px;
+}
+.comment-delete-btn:hover { color: #e03e3e; background: #fff0f0; }
+.comment-compose { display: flex; gap: 8px; align-items: flex-end; }
+.comment-input {
+  flex: 1; border: 1px solid #e5e5e5;
+  border-radius: 10px; padding: 8px 12px;
+  font-size: 13px; font-family: inherit;
+  color: #222; outline: none; resize: none;
+  min-height: 38px; max-height: 120px; line-height: 1.4;
+}
+.comment-input:focus { border-color: #bbb; }
+.comment-input::placeholder { color: #bbb; }
+
+/* ── States ── */
+.state-msg { text-align: center; padding: 48px 0; color: #bbb; font-size: 14px; line-height: 1.6; }
+.state-msg .icon { font-size: 28px; margin-bottom: 8px; }
+
+/* ── Skeleton ── */
+.skeleton { animation: pulse 1.4s ease-in-out infinite; }
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+.skel-card { background: #f5f5f5; border-radius: 14px; height: 110px; margin-bottom: 16px; }
+
+/* ── Confirm modal ── */
+.modal-backdrop {
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,0.18);
+  z-index: 200;
+  display: flex; align-items: center; justify-content: center;
+  padding: 24px;
+}
+.modal-box {
+  background: #fff; border-radius: 14px;
+  padding: 24px 20px 18px;
+  max-width: 320px; width: 100%;
+  box-shadow: 0 8px 40px rgba(0,0,0,0.14);
+}
+.modal-box p { font-size: 14px; color: #333; line-height: 1.5; margin-bottom: 18px; }
+.modal-actions { display: flex; gap: 8px; justify-content: flex-end; }
+.btn-cancel {
+  background: #f3f3f3; border: none; border-radius: var(--radius);
+  padding: 8px 16px; font-size: 13px; font-weight: 500;
+  color: #555; cursor: pointer; font-family: inherit;
+}
+.btn-cancel:hover { background: #e8e8e8; }
+.btn-danger {
+  background: #e03e3e; border: none; border-radius: var(--radius);
+  padding: 8px 16px; font-size: 13px; font-weight: 600;
+  color: #fff; cursor: pointer; font-family: inherit;
+}
+.btn-danger:hover { background: #c53030; }
+
+/* ── Toast ── */
+.toast {
+  position: fixed; bottom: 110px; left: 50%; transform: translateX(-50%);
+  background: #333; color: #fff; font-size: 13px;
+  padding: 9px 18px; border-radius: 20px;
+  z-index: 300; opacity: 0; transition: opacity 0.2s;
+  white-space: nowrap; pointer-events: none;
+}
+.toast.show { opacity: 1; }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="topbar-inner">
+    <button class="back-btn" id="backBtn">
+      <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 2L4 7l5 5"/></svg>
+      Back
+    </button>
+    <span class="topbar-title" id="pageTitle">Forum</span>
+  </div>
+</div>
+
+<div class="bottombar"></div>
+
+<div class="shell">
+  <div class="compose">
+    <div class="compose-header">
+      <div class="avatar" id="composeAvatar">?</div>
+      <span class="compose-name" id="composeName">Loading…</span>
+    </div>
+    <textarea id="postInput" placeholder="Share something with the community…" rows="3"></textarea>
+    <div class="compose-footer">
+      <span class="error-msg" id="postError" style="display:none"></span>
+      <button class="btn-post" id="submitPost" disabled>Post</button>
+    </div>
+  </div>
+
+  <div id="feed" class="feed">
+    <div class="skel-card skeleton"></div>
+    <div class="skel-card skeleton"></div>
+    <div class="skel-card skeleton"></div>
+  </div>
+
+  <div id="emptyState" class="state-msg" style="display:none">
+    <div class="icon">💬</div>
+    Be the first to post something.
+  </div>
+
+  <div id="loadError" class="state-msg" style="display:none">
+    <div class="icon">⚠️</div>
+    <span id="loadErrorMsg">Couldn't load posts.</span>
+  </div>
+</div>
+
+<!-- Confirm modal -->
+<div class="modal-backdrop" id="modalBackdrop" style="display:none">
+  <div class="modal-box">
+    <p id="modalMsg">Are you sure?</p>
+    <div class="modal-actions">
+      <button class="btn-cancel" id="modalCancel">Cancel</button>
+      <button class="btn-danger" id="modalOk">Delete</button>
+    </div>
+  </div>
+</div>
+
+<!-- Toast -->
+<div class="toast" id="toast"></div>
+
+<script>
+// =============================================================
+// Cogniss External Template — Community Forum
+// =============================================================
+
+// ── Bridge ────────────────────────────────────────────────────
+var isNative = (typeof window.ReactNativeWebView !== 'undefined');
+
+function postToApp(key, data) {
+  var msg = JSON.stringify({ key: key, data: data || null });
+  if (isNative) window.ReactNativeWebView.postMessage(msg);
+  else window.parent.postMessage(msg, '*');
+}
+
+// ── State ─────────────────────────────────────────────────────
+var appState  = {};
+var REQUIRED  = ['API', 'USER', 'AUTH', 'ACTIVITY', 'ACTIVITY_RESPONSE', 'CONFIG'];
+var started   = false;
+var posts     = [];
+var apiUrl    = '';
+var userId    = '';
+var userName  = '';
+var userInits = '';
+
+// ── REST_REQUEST helper (for theme) ───────────────────────────
+var _reqCounter = 0;
+var _reqMap = {};
+
+function restRequest(method, model, data) {
+  return new Promise(function(resolve, reject) {
+    var id = 'rr' + (++_reqCounter);
+    _reqMap[id] = { resolve: resolve, reject: reject };
+    var msg = JSON.stringify({ key: 'REST_REQUEST', method: method, model: model, data: data || {}, id: id, specialParams: null });
+    if (isNative) window.ReactNativeWebView.postMessage(msg);
+    else window.parent.postMessage(msg, '*');
+  });
+}
+
+// ── Message handler ───────────────────────────────────────────
+function onMessage(evt) {
+  try {
+    var msg = JSON.parse(evt.data);
+    if (!msg || !msg.key) return;
+
+    // REST_REQUEST responses
+    if (msg.key === 'REQUEST_RESPONSE') {
+      var p = _reqMap[msg.id];
+      if (p) {
+        delete _reqMap[msg.id];
+        if (msg.error) p.reject(new Error(msg.error));
+        else p.resolve(msg.data);
+      }
+      return;
+    }
+
+    // Init messages
+    appState[msg.key] = msg.data;
+    if (!started && REQUIRED.every(function(k) { return appState[k] !== undefined; })) {
+      started = true;
+      startTemplate();
+    }
+  } catch(e) {}
+}
+
+document.addEventListener('message', onMessage);
+window.addEventListener('message', onMessage);
+window.addEventListener('load', function() { postToApp('READY_DYNAMIC_MEDIA'); });
+
+// ── Start ─────────────────────────────────────────────────────
+function startTemplate() {
+  var cfg = appState.CONFIG || {};
+  var u   = appState.USER   || {};
+  var act = appState.ACTIVITY || {};
+
+  apiUrl   = cfg.appsScriptUrl || '';
+  userId   = u.id || u._id || ('anon-' + Math.random().toString(36).slice(2, 8));
+  userName = u.displayName || u.display_name || u.name || u.fullName
+    || ([u.firstName, u.lastName].filter(Boolean).join(' '))
+    || ([u.first_name, u.last_name].filter(Boolean).join(' '))
+    || u.username || u.email || 'Anonymous';
+
+  console.log('[Forum] USER fields:', JSON.stringify(u));
+
+  userInits = userName.trim().split(/\s+/).map(function(w) { return w[0]; }).join('').slice(0, 2).toUpperCase();
+
+  // Set title from activity name
+  var actName = act.name || 'Forum';
+  document.getElementById('pageTitle').textContent = actName;
+  document.title = actName;
+
+  // Set compose header
+  var avEl = document.getElementById('composeAvatar');
+  avEl.textContent = userInits;
+  avEl.style.background = avatarColor(userId);
+  document.getElementById('composeName').textContent = userName;
+  document.getElementById('submitPost').disabled = false;
+
+  // Apply app theme (non-blocking)
+  applyTheme();
+
+  if (!apiUrl) {
+    showLoadError('appsScriptUrl is missing from CONFIG.');
+    return;
+  }
+
+  // Fix stale Anonymous entries for this user
+  if (userName !== 'Anonymous') {
+    callApi({ action: 'updateDisplayName', userId: userId, displayName: userName }).catch(function() {});
+  }
+
+  loadPosts();
+}
+
+// ── JSONP API ─────────────────────────────────────────────────
+var _cbCounter = 0;
+
+function callApi(params) {
+  return new Promise(function(resolve, reject) {
+    var cbName = '_fc' + (++_cbCounter);
+    var timer = setTimeout(function() {
+      delete window[cbName];
+      reject(new Error('Timed out'));
+    }, 15000);
+
+    window[cbName] = function(data) {
+      clearTimeout(timer);
+      delete window[cbName];
+      if (tag && tag.parentNode) tag.parentNode.removeChild(tag);
+      resolve(data);
+    };
+
+    var qs = Object.keys(params).map(function(k) {
+      return encodeURIComponent(k) + '=' + encodeURIComponent(params[k]);
+    }).join('&');
+
+    var tag = document.createElement('script');
+    tag.src = apiUrl + '?' + qs + '&callback=' + cbName;
+    tag.onerror = function() {
+      clearTimeout(timer);
+      delete window[cbName];
+      reject(new Error('Network error'));
+    };
+    document.head.appendChild(tag);
+  });
+}
+
+// ── Load posts ────────────────────────────────────────────────
+function loadPosts() {
+  callApi({ action: 'getPosts', userId: userId })
+    .then(function(res) {
+      if (!res.ok) throw new Error(res.error);
+      posts = res.data || [];
+      renderFeed();
+    })
+    .catch(function(e) {
+      showLoadError('Could not load posts. Check appsScriptUrl in CONFIG.');
+    });
+}
+
+// ── Render feed ───────────────────────────────────────────────
+function renderFeed() {
+  var feed = document.getElementById('feed');
+  feed.innerHTML = '';
+  document.getElementById('emptyState').style.display = posts.length ? 'none' : 'block';
+  document.getElementById('loadError').style.display  = 'none';
+  posts.forEach(function(post) {
+    feed.appendChild(makeCard(post));
+  });
+}
+
+function makeCard(post) {
+  var card = document.createElement('div');
+  card.className = 'post-card';
+  card.setAttribute('data-id', post.id);
+
+  // Meta
+  var meta = document.createElement('div');
+  meta.className = 'post-meta';
+
+  var av = document.createElement('div');
+  av.className = 'avatar';
+  av.textContent = initials(post.authorName);
+  av.style.background = avatarColor(post.authorId);
+
+  var authorEl = document.createElement('span');
+  authorEl.className = 'post-author';
+  authorEl.textContent = post.authorName || 'Unknown';
+
+  var timeEl = document.createElement('span');
+  timeEl.className = 'post-time';
+  timeEl.textContent = relTime(post.timestamp);
+
+  meta.appendChild(av);
+  meta.appendChild(authorEl);
+  meta.appendChild(timeEl);
+
+  // Body
+  var bodyEl = document.createElement('div');
+  bodyEl.className = 'post-body';
+  bodyEl.innerHTML = linkify(post.body);
+
+  // Actions
+  var actions = document.createElement('div');
+  actions.className = 'post-actions';
+
+  var likeBtn = document.createElement('button');
+  likeBtn.className = 'action-btn' + (post.likedByMe ? ' liked' : '');
+  likeBtn.innerHTML = heartSVG(post.likedByMe) + '<span>' + post.likeCount + '</span>';
+  likeBtn.addEventListener('click', function() { doLike(post, card); });
+
+  var commentBtn = document.createElement('button');
+  commentBtn.className = 'action-btn';
+  commentBtn.innerHTML = chatSVG() + '<span class="ccount">' + post.commentCount + '</span>';
+  commentBtn.addEventListener('click', function() {
+    card.querySelector('.comments-section').classList.toggle('open');
+  });
+
+  actions.appendChild(likeBtn);
+  actions.appendChild(commentBtn);
+
+  // Delete own post
+  if (post.authorId === userId) {
+    var delBtn = document.createElement('button');
+    delBtn.className = 'action-btn delete-post-btn';
+    delBtn.innerHTML = trashSVG() + ' Delete';
+    delBtn.addEventListener('click', function() { doDeletePost(post, card); });
+    actions.appendChild(delBtn);
+  }
+
+  // Comments section
+  var commSec = document.createElement('div');
+  commSec.className = 'comments-section';
+
+  var commList = document.createElement('div');
+  commList.className = 'comment-list';
+  commList.id = 'clist-' + post.id;
+  renderComments(commList, post.comments || [], post.id);
+
+  // Comment compose
+  var compose = document.createElement('div');
+  compose.className = 'comment-compose';
+
+  var myAv = document.createElement('div');
+  myAv.className = 'avatar sm';
+  myAv.textContent = userInits;
+  myAv.style.background = avatarColor(userId);
+
+  var cinput = document.createElement('textarea');
+  cinput.className = 'comment-input';
+  cinput.placeholder = 'Write a comment…';
+  cinput.rows = 1;
+  cinput.addEventListener('input', function() {
+    this.style.height = 'auto';
+    this.style.height = Math.min(this.scrollHeight, 120) + 'px';
+  });
+
+  var csubmit = document.createElement('button');
+  csubmit.className = 'btn-comment';
+  csubmit.textContent = 'Reply';
+  csubmit.addEventListener('click', function() { doComment(post, card, cinput, csubmit); });
+
+  compose.appendChild(myAv);
+  compose.appendChild(cinput);
+  compose.appendChild(csubmit);
+
+  commSec.appendChild(commList);
+  commSec.appendChild(compose);
+
+  card.appendChild(meta);
+  card.appendChild(bodyEl);
+  card.appendChild(actions);
+  card.appendChild(commSec);
+
+  return card;
+}
+
+function renderComments(listEl, comments, postId) {
+  listEl.innerHTML = '';
+  (comments || []).sort(function(a, b) { return new Date(a.timestamp) - new Date(b.timestamp); });
+  comments.forEach(function(c) {
+    var item = document.createElement('div');
+    item.className = 'comment-item';
+    item.setAttribute('data-cid', c.id);
+
+    var av = document.createElement('div');
+    av.className = 'avatar sm';
+    av.textContent = initials(c.authorName);
+    av.style.background = avatarColor(c.authorId);
+
+    var bubble = document.createElement('div');
+    bubble.className = 'comment-bubble';
+
+    var cauth = document.createElement('div');
+    cauth.className = 'comment-author';
+    cauth.textContent = c.authorName || 'Unknown';
+
+    var cbody = document.createElement('div');
+    cbody.className = 'comment-body';
+    cbody.innerHTML = linkify(c.body);
+
+    var ctime = document.createElement('div');
+    ctime.className = 'comment-time';
+    ctime.textContent = relTime(c.timestamp);
+
+    bubble.appendChild(cauth);
+    bubble.appendChild(cbody);
+    bubble.appendChild(ctime);
+    item.appendChild(av);
+    item.appendChild(bubble);
+
+    // Delete own comment
+    if (c.authorId === userId) {
+      var delbtn = document.createElement('button');
+      delbtn.className = 'comment-delete-btn';
+      delbtn.innerHTML = trashSVG();
+      delbtn.addEventListener('click', function() { doDeleteComment(c.id, postId, item, card_ref); });
+      item.appendChild(delbtn);
+    }
+
+    listEl.appendChild(item);
+  });
+
+  // card_ref is set when called from makeCard context — patch it in below
+  function card_ref() { return document.querySelector('[data-id="' + postId + '"]'); }
+}
+
+// ── Like ──────────────────────────────────────────────────────
+function doLike(post, card) {
+  var btn = card.querySelector('.action-btn.liked, .action-btn:first-child');
+  // find the like button specifically
+  var likeBtn = card.querySelector('.post-actions .action-btn');
+  var span    = likeBtn.querySelector('span');
+  var wasLiked = post.likedByMe;
+
+  post.likedByMe  = !wasLiked;
+  post.likeCount += wasLiked ? -1 : 1;
+  span.textContent = post.likeCount;
+  if (post.likedByMe) likeBtn.classList.add('liked');
+  else likeBtn.classList.remove('liked');
+  likeBtn.innerHTML = heartSVG(post.likedByMe) + '<span>' + post.likeCount + '</span>';
+  likeBtn.addEventListener('click', function() { doLike(post, card); });
+
+  callApi({ action: 'toggleLike', postId: post.id, userId: userId }).catch(function() {
+    // revert
+    post.likedByMe  = wasLiked;
+    post.likeCount += wasLiked ? 1 : -1;
+    likeBtn.innerHTML = heartSVG(post.likedByMe) + '<span>' + post.likeCount + '</span>';
+    likeBtn.addEventListener('click', function() { doLike(post, card); });
+  });
+}
+
+// ── New post ──────────────────────────────────────────────────
+document.getElementById('postInput').addEventListener('input', function() {
+  document.getElementById('submitPost').disabled = !this.value.trim();
+  this.style.height = 'auto';
+  this.style.height = this.scrollHeight + 'px';
+});
+
+document.getElementById('submitPost').addEventListener('click', function() {
+  var input = document.getElementById('postInput');
+  var text  = input.value.trim();
+  if (!text) return;
+  var btn = document.getElementById('submitPost');
+  btn.disabled = true;
+  btn.textContent = 'Posting…';
+
+  callApi({ action: 'createPost', authorId: userId, authorName: userName, text: text })
+    .then(function(res) {
+      if (!res.ok) throw new Error(res.error);
+      posts.unshift(res.data);
+      input.value = '';
+      input.style.height = '';
+      renderFeed();
+    })
+    .catch(function() {
+      var e = document.getElementById('postError');
+      e.textContent = 'Failed to post. Try again.';
+      e.style.display = 'inline';
+      setTimeout(function() { e.style.display = 'none'; }, 3000);
+    })
+    .finally(function() {
+      btn.disabled = false;
+      btn.textContent = 'Post';
+    });
+});
+
+// ── New comment ───────────────────────────────────────────────
+function doComment(post, card, input, btn) {
+  var text = input.value.trim();
+  if (!text) return;
+  btn.disabled = true;
+  btn.textContent = '…';
+
+  callApi({ action: 'addComment', postId: post.id, authorId: userId, authorName: userName, text: text })
+    .then(function(res) {
+      if (!res.ok) throw new Error(res.error);
+      if (!post.comments) post.comments = [];
+      post.comments.push(res.data);
+      post.commentCount++;
+      var listEl = document.getElementById('clist-' + post.id);
+      renderComments(listEl, post.comments, post.id);
+      card.querySelector('.ccount').textContent = post.commentCount;
+      input.value = '';
+      input.style.height = '';
+    })
+    .catch(function() {})
+    .finally(function() {
+      btn.disabled = false;
+      btn.textContent = 'Reply';
+    });
+}
+
+// ── Delete post ───────────────────────────────────────────────
+function doDeletePost(post, card) {
+  showConfirm('Delete this post? This cannot be undone.', function() {
+    card.style.opacity = '0.4';
+    card.style.pointerEvents = 'none';
+    callApi({ action: 'deletePost', postId: post.id, userId: userId })
+      .then(function(res) {
+        if (!res.ok) throw new Error(res.error);
+        posts = posts.filter(function(p) { return p.id !== post.id; });
+        card.remove();
+        showToast('Post deleted');
+        if (!posts.length) document.getElementById('emptyState').style.display = 'block';
+      })
+      .catch(function() {
+        card.style.opacity = '';
+        card.style.pointerEvents = '';
+        showToast('Could not delete. Try again.');
+      });
+  });
+}
+
+// ── Delete comment ────────────────────────────────────────────
+function doDeleteComment(commentId, postId, item, getCard) {
+  showConfirm('Delete this comment?', function() {
+    item.style.opacity = '0.4';
+    item.style.pointerEvents = 'none';
+    callApi({ action: 'deleteComment', commentId: commentId, userId: userId })
+      .then(function(res) {
+        if (!res.ok) throw new Error(res.error);
+        var post = posts.find(function(p) { return p.id === postId; });
+        if (post) {
+          post.comments = (post.comments || []).filter(function(c) { return c.id !== commentId; });
+          post.commentCount = Math.max(0, post.commentCount - 1);
+          var card = getCard();
+          if (card) card.querySelector('.ccount').textContent = post.commentCount;
+        }
+        item.remove();
+        showToast('Comment deleted');
+      })
+      .catch(function() {
+        item.style.opacity = '';
+        item.style.pointerEvents = '';
+        showToast('Could not delete. Try again.');
+      });
+  });
+}
+
+// ── Back button ───────────────────────────────────────────────
+document.getElementById('backBtn').addEventListener('click', function() {
+  postToApp('QUIT', { completeState: 'COMPLETE' });
+});
+
+// ── Confirm modal ─────────────────────────────────────────────
+function showConfirm(msg, onOk) {
+  document.getElementById('modalMsg').textContent = msg;
+  document.getElementById('modalBackdrop').style.display = 'flex';
+
+  function close() {
+    document.getElementById('modalBackdrop').style.display = 'none';
+    var ok = document.getElementById('modalOk');
+    var cancel = document.getElementById('modalCancel');
+    ok.replaceWith(ok.cloneNode(true));
+    cancel.replaceWith(cancel.cloneNode(true));
+  }
+
+  document.getElementById('modalOk').addEventListener('click', function() { close(); onOk(); });
+  document.getElementById('modalCancel').addEventListener('click', close);
+  document.getElementById('modalBackdrop').addEventListener('click', function(e) {
+    if (e.target === this) close();
+  });
+}
+
+// ── Toast ─────────────────────────────────────────────────────
+function showToast(msg) {
+  var t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(function() { t.classList.remove('show'); }, 2800);
+}
+
+// ── Error state ───────────────────────────────────────────────
+function showLoadError(msg) {
+  document.getElementById('feed').innerHTML = '';
+  document.getElementById('loadError').style.display = 'block';
+  document.getElementById('loadErrorMsg').textContent = msg;
+}
+
+// ── Theme (non-blocking) ──────────────────────────────────────
+function applyTheme() {
+  var appId = appState.ACTIVITY_RESPONSE && appState.ACTIVITY_RESPONSE.app;
+  if (!appId) return;
+
+  Promise.all([
+    restRequest('get',  'App',      appId),
+    restRequest('list', 'Settings', {})
+  ]).then(function(results) {
+    var appRec   = results[0] || {};
+    var settings = results[1] || {};
+    var appTheme = appRec.theme || {};
+    var platTheme = (settings.items && settings.items[0] && settings.items[0].theme) || {};
+    var colors = Object.assign({}, platTheme.colors || {}, appTheme.colors || {});
+
+    var root = document.documentElement;
+
+    if (colors.primary) {
+      root.style.setProperty('--primary', colors.primary);
+      root.style.setProperty('--primary-dark', darken(colors.primary, 30));
+      root.style.setProperty('--primary-text', lum(colors.primary) > 0.35 ? '#111' : '#fff');
+    }
+
+    var hdrColor = (appTheme.activityHeader && appTheme.activityHeader.color)
+      || (appTheme.appHeader && appTheme.appHeader.color)
+      || (platTheme.appHeader && platTheme.appHeader.color);
+    if (hdrColor) {
+      root.style.setProperty('--topbar-bg', hdrColor);
+      root.style.setProperty('--topbar-border', darken(hdrColor, 15));
+      var tc = lum(hdrColor) > 0.35 ? '#111' : '#fff';
+      document.getElementById('pageTitle').style.color = tc;
+      var bb = document.getElementById('backBtn');
+      bb.style.color = tc;
+      bb.style.borderColor = tc === '#fff' ? 'rgba(255,255,255,0.3)' : '#e5e5e5';
+    }
+
+    var radiusMap = { NONE:'0px', SMALL:'4px', MEDIUM:'8px', LARGE:'16px', FULL:'9999px' };
+    var rounded = appTheme.rounded || platTheme.rounded;
+    if (rounded && radiusMap[rounded]) {
+      root.style.setProperty('--radius', radiusMap[rounded]);
+    }
+  }).catch(function(e) {
+    console.log('[Forum] Theme load skipped:', e.message);
+  });
+}
+
+// ── Utilities ─────────────────────────────────────────────────
+function esc(s) {
+  return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+function linkify(s) {
+  return esc(s).replace(/\n/g,'<br>').replace(/(https?:\/\/[^\s<>"]+)/g,'<a href="$1" target="_blank" rel="noopener noreferrer">$1</a>');
+}
+function initials(name) {
+  return String(name || '?').trim().split(/\s+/).map(function(w){ return w[0]; }).join('').slice(0,2).toUpperCase();
+}
+function relTime(ts) {
+  if (!ts) return '';
+  var d = (Date.now() - new Date(ts)) / 1000;
+  if (d < 60)    return 'just now';
+  if (d < 3600)  return Math.floor(d/60) + 'm ago';
+  if (d < 86400) return Math.floor(d/3600) + 'h ago';
+  return Math.floor(d/86400) + 'd ago';
+}
+var COLORS = ['#6366f1','#0ea5e9','#10b981','#f59e0b','#ef4444','#8b5cf6','#ec4899','#14b8a6'];
+function avatarColor(id) {
+  var n = 0, s = String(id || '');
+  for (var i = 0; i < s.length; i++) n += s.charCodeAt(i);
+  return COLORS[n % COLORS.length];
+}
+function lum(hex) {
+  var h = hex.replace('#','');
+  if (h.length === 3) h = h[0]+h[0]+h[1]+h[1]+h[2]+h[2];
+  var r=parseInt(h.slice(0,2),16)/255, g=parseInt(h.slice(2,4),16)/255, b=parseInt(h.slice(4,6),16)/255;
+  var c = function(x){ return x<=0.03928?x/12.92:Math.pow((x+0.055)/1.055,2.4); };
+  return 0.2126*c(r)+0.7152*c(g)+0.0722*c(b);
+}
+function darken(hex, amt) {
+  var h = hex.replace('#','');
+  if (h.length === 3) h = h[0]+h[0]+h[1]+h[1]+h[2]+h[2];
+  var r=Math.max(0,parseInt(h.slice(0,2),16)-amt);
+  var g=Math.max(0,parseInt(h.slice(2,4),16)-amt);
+  var b=Math.max(0,parseInt(h.slice(4,6),16)-amt);
+  return '#'+[r,g,b].map(function(v){return v.toString(16).padStart(2,'0');}).join('');
+}
+function heartSVG(filled) {
+  var f = filled ? '#e03e3e' : 'none', s = filled ? '#e03e3e' : 'currentColor';
+  return '<svg width="15" height="15" viewBox="0 0 24 24" fill="'+f+'" stroke="'+s+'" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>';
+}
+function chatSVG() {
+  return '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>';
+}
+function trashSVG() {
+  return '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4h6v2"/></svg>';
+}
+</script>
+</body>
+</html>
