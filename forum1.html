@@ -1,0 +1,663 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Forum</title>
+<style>
+  /* ── Reset & base ── */
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    background: #ffffff;
+    color: #1a1a1a;
+    min-height: 100vh;
+    padding: 100px 0;
+  }
+
+  /* ── Layout shell ── */
+  .shell {
+    max-width: 640px;
+    margin: 0 auto;
+    padding: 0 20px;
+  }
+
+  /* ── Top bar ── */
+  .topbar {
+    position: fixed;
+    top: 0; left: 0; right: 0;
+    height: 100px;
+    background: #ffffff;
+    border-bottom: 1px solid #f0f0f0;
+    display: flex;
+    align-items: flex-end;
+    padding-bottom: 14px;
+    z-index: 100;
+  }
+  .topbar-inner {
+    max-width: 640px;
+    margin: 0 auto;
+    width: 100%;
+    padding: 0 20px;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+  }
+  .back-btn {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    background: none;
+    border: 1px solid #e5e5e5;
+    border-radius: 8px;
+    padding: 7px 12px;
+    font-size: 13px;
+    font-weight: 500;
+    color: #555;
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s;
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+  .back-btn:hover { background: #f7f7f7; color: #111; }
+  .back-btn svg { flex-shrink: 0; }
+  .topbar-title {
+    font-size: 17px;
+    font-weight: 650;
+    color: #111;
+    letter-spacing: -0.3px;
+  }
+
+  /* ── Bottom spacer bar ── */
+  .bottombar {
+    position: fixed;
+    bottom: 0; left: 0; right: 0;
+    height: 100px;
+    background: linear-gradient(to top, #ffffff 60%, transparent);
+    pointer-events: none;
+    z-index: 50;
+  }
+
+  /* ── Compose box ── */
+  .compose {
+    background: #fafafa;
+    border: 1px solid #ebebeb;
+    border-radius: 14px;
+    padding: 16px;
+    margin-bottom: 24px;
+  }
+  .compose-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 12px;
+  }
+  .avatar {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background: #e8e8e8;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 13px;
+    font-weight: 600;
+    color: #555;
+    flex-shrink: 0;
+    text-transform: uppercase;
+  }
+  .avatar.sm {
+    width: 28px;
+    height: 28px;
+    font-size: 11px;
+  }
+  .compose-name {
+    font-size: 13px;
+    font-weight: 600;
+    color: #111;
+  }
+  .compose textarea {
+    width: 100%;
+    border: none;
+    background: transparent;
+    resize: none;
+    font-size: 14px;
+    line-height: 1.5;
+    color: #222;
+    outline: none;
+    min-height: 64px;
+    font-family: inherit;
+  }
+  .compose textarea::placeholder { color: #bbb; }
+  .compose-footer {
+    display: flex;
+    justify-content: flex-end;
+    margin-top: 10px;
+  }
+  .btn-post {
+    background: #111;
+    color: #fff;
+    border: none;
+    border-radius: 8px;
+    padding: 8px 18px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.15s, opacity 0.15s;
+  }
+  .btn-post:hover { background: #333; }
+  .btn-post:disabled { opacity: 0.35; cursor: not-allowed; }
+
+  /* ── Feed ── */
+  .feed { display: flex; flex-direction: column; gap: 16px; }
+
+  /* ── Post card ── */
+  .post-card {
+    background: #fff;
+    border: 1px solid #ebebeb;
+    border-radius: 14px;
+    padding: 18px 18px 14px;
+    transition: border-color 0.15s;
+  }
+  .post-card:hover { border-color: #d8d8d8; }
+  .post-meta {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 12px;
+  }
+  .post-author { font-size: 13px; font-weight: 600; color: #111; }
+  .post-time   { font-size: 12px; color: #aaa; margin-left: auto; }
+  .post-body   { font-size: 14px; line-height: 1.6; color: #333; margin-bottom: 14px; }
+
+  /* ── Actions row ── */
+  .post-actions {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    border-top: 1px solid #f3f3f3;
+    padding-top: 12px;
+  }
+  .action-btn {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    background: none;
+    border: none;
+    padding: 6px 10px;
+    border-radius: 8px;
+    font-size: 13px;
+    color: #888;
+    cursor: pointer;
+    transition: background 0.12s, color 0.12s;
+    font-family: inherit;
+  }
+  .action-btn:hover { background: #f5f5f5; color: #333; }
+  .action-btn.liked { color: #e03e3e; }
+  .action-btn.liked svg { fill: #e03e3e; stroke: #e03e3e; }
+  .action-btn svg { transition: fill 0.12s, stroke 0.12s; }
+
+  /* ── Comments section ── */
+  .comments-section {
+    margin-top: 14px;
+    display: none;
+    flex-direction: column;
+    gap: 0;
+  }
+  .comments-section.open { display: flex; }
+
+  .comment-list { display: flex; flex-direction: column; gap: 10px; margin-bottom: 12px; }
+  .comment-item {
+    display: flex;
+    gap: 9px;
+    align-items: flex-start;
+  }
+  .comment-bubble {
+    background: #f7f7f7;
+    border-radius: 10px;
+    padding: 8px 11px;
+    flex: 1;
+  }
+  .comment-author { font-size: 12px; font-weight: 600; color: #111; margin-bottom: 2px; }
+  .comment-body   { font-size: 13px; color: #444; line-height: 1.45; }
+  .comment-time   { font-size: 11px; color: #bbb; margin-top: 3px; }
+
+  .comment-compose {
+    display: flex;
+    gap: 8px;
+    align-items: flex-end;
+  }
+  .comment-input {
+    flex: 1;
+    border: 1px solid #e5e5e5;
+    border-radius: 10px;
+    padding: 8px 12px;
+    font-size: 13px;
+    font-family: inherit;
+    color: #222;
+    outline: none;
+    resize: none;
+    min-height: 38px;
+    max-height: 120px;
+    line-height: 1.4;
+    transition: border-color 0.15s;
+  }
+  .comment-input:focus { border-color: #bbb; }
+  .comment-input::placeholder { color: #bbb; }
+  .btn-comment {
+    background: #111;
+    color: #fff;
+    border: none;
+    border-radius: 8px;
+    padding: 8px 14px;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    white-space: nowrap;
+    flex-shrink: 0;
+    transition: background 0.15s, opacity 0.15s;
+    font-family: inherit;
+  }
+  .btn-comment:hover { background: #333; }
+  .btn-comment:disabled { opacity: 0.35; cursor: not-allowed; }
+
+  /* ── States ── */
+  .state-msg {
+    text-align: center;
+    padding: 48px 0;
+    color: #bbb;
+    font-size: 14px;
+  }
+  .state-msg .icon { font-size: 28px; margin-bottom: 8px; }
+  .error-msg { color: #d44; font-size: 13px; margin-top: 6px; }
+
+  /* ── Loading skeleton ── */
+  .skeleton { animation: pulse 1.4s ease-in-out infinite; }
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50%       { opacity: 0.4; }
+  }
+  .skel-card {
+    background: #f5f5f5;
+    border-radius: 14px;
+    height: 120px;
+    margin-bottom: 16px;
+  }
+</style>
+</head>
+<body>
+
+<!-- Fixed top bar -->
+<div class="topbar">
+  <div class="topbar-inner">
+    <button class="back-btn" id="backBtn">
+      <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M9 2L4 7l5 5"/>
+      </svg>
+      Back
+    </button>
+    <span class="topbar-title">Community</span>
+  </div>
+</div>
+
+<!-- Fixed bottom fade -->
+<div class="bottombar"></div>
+
+<!-- Main content -->
+<div class="shell">
+
+  <!-- Compose -->
+  <div class="compose" id="compose">
+    <div class="compose-header">
+      <div class="avatar" id="composeAvatar">?</div>
+      <span class="compose-name" id="composeName">Loading…</span>
+    </div>
+    <textarea id="postInput" placeholder="Share something with the community…" rows="3"></textarea>
+    <div class="compose-footer">
+      <div>
+        <button class="btn-post" id="submitPost" disabled>Post</button>
+        <div class="error-msg" id="postError" style="display:none"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Feed -->
+  <div id="feed" class="feed">
+    <div class="skel-card skeleton"></div>
+    <div class="skel-card skeleton"></div>
+    <div class="skel-card skeleton"></div>
+  </div>
+
+  <div id="emptyState" class="state-msg" style="display:none">
+    <div class="icon">💬</div>
+    Be the first to post something.
+  </div>
+
+  <div id="loadError" class="state-msg" style="display:none">
+    <div class="icon">⚠️</div>
+    Couldn't load posts. Check the API URL in CONFIG.
+  </div>
+
+</div>
+
+<script>
+// ── Bridge ────────────────────────────────────────────────────
+const isNative = typeof window.ReactNativeWebView !== 'undefined'
+
+function postToApp(key, data = null) {
+  const text = JSON.stringify({ key, data })
+  if (isNative) window.ReactNativeWebView.postMessage(text)
+  else window.parent.postMessage(text, '*')
+}
+
+// ── State ─────────────────────────────────────────────────────
+const state = {}
+const REQUIRED = ['API', 'USER', 'AUTH', 'ACTIVITY', 'ACTIVITY_RESPONSE', 'CONFIG']
+let posts   = []
+let apiUrl  = ''         // set from state.CONFIG.appsScriptUrl
+let userId  = ''
+let userName = ''
+let initials = ''
+
+// ── Init messages ─────────────────────────────────────────────
+function onMessage(event) {
+  try {
+    const msg = JSON.parse(event.data)
+    if (!msg || !msg.key) return
+    state[msg.key] = msg.data
+    if (REQUIRED.every(k => state[k] !== undefined)) startTemplate()
+  } catch(e) {}
+}
+document.addEventListener('message', onMessage)
+window.addEventListener('message',   onMessage)
+
+window.addEventListener('load', () => postToApp('READY_DYNAMIC_MEDIA'))
+
+// ── Start ─────────────────────────────────────────────────────
+function startTemplate() {
+  apiUrl   = (state.CONFIG && state.CONFIG.appsScriptUrl) || ''
+  userId   = state.USER.id   || 'anon-' + Math.random().toString(36).slice(2,8)
+  userName = [state.USER.firstName, state.USER.lastName].filter(Boolean).join(' ') || 'Anonymous'
+  initials = userName.split(' ').map(w => w[0]).join('').slice(0,2).toUpperCase()
+
+  document.getElementById('composeAvatar').textContent = initials
+  document.getElementById('composeName').textContent   = userName
+  document.getElementById('submitPost').disabled       = false
+
+  if (!apiUrl) {
+    showError('appsScriptUrl is not set in CONFIG. Add it via the Creator tool.')
+    return
+  }
+  loadPosts()
+}
+
+// ── API via JSONP (the only way to avoid CORS on Apps Script) ─
+// Apps Script does not support custom response headers, so we
+// inject a <script> tag with a ?callback= param — the server
+// wraps JSON in the callback function, bypassing CORS entirely.
+// All writes (createPost, toggleLike, addComment) are also GET.
+let _cbId = 0
+function api(params) {
+  return new Promise((resolve, reject) => {
+    const cbName = '_fc' + (++_cbId)
+    const timer  = setTimeout(() => {
+      delete window[cbName]
+      reject(new Error('Timed out'))
+    }, 12000)
+
+    window[cbName] = function(data) {
+      clearTimeout(timer)
+      delete window[cbName]
+      if (tag.parentNode) tag.parentNode.removeChild(tag)
+      resolve(data)
+    }
+
+    const qs  = Object.keys(params).map(k =>
+      encodeURIComponent(k) + '=' + encodeURIComponent(params[k])
+    ).join('&')
+
+    const tag = document.createElement('script')
+    tag.src = apiUrl + '?' + qs + '&callback=' + cbName
+    tag.onerror = () => {
+      clearTimeout(timer)
+      delete window[cbName]
+      reject(new Error('Script load failed'))
+    }
+    document.head.appendChild(tag)
+  })
+}
+
+// ── Load posts ────────────────────────────────────────────────
+async function loadPosts() {
+  try {
+    const result = await api({ action: 'getPosts', userId })
+    if (!result.ok) throw new Error(result.error)
+    posts = result.data
+    renderFeed()
+  } catch(e) {
+    showError(null)
+  }
+}
+
+// ── Render feed ───────────────────────────────────────────────
+function renderFeed() {
+  const feed = document.getElementById('feed')
+  feed.innerHTML = ''
+  document.getElementById('emptyState').style.display = posts.length ? 'none' : 'block'
+  document.getElementById('loadError').style.display  = 'none'
+  posts.forEach(post => feed.appendChild(makePostCard(post)))
+}
+
+function makePostCard(post) {
+  const card = document.createElement('div')
+  card.className = 'post-card'
+  card.dataset.id = post.id
+
+  const av = initials2(post.authorName)
+  const ts = relTime(post.timestamp)
+
+  card.innerHTML = `
+    <div class="post-meta">
+      <div class="avatar" style="background:${avatarColor(post.authorId)};color:#fff">${av}</div>
+      <span class="post-author">${esc(post.authorName)}</span>
+      <span class="post-time">${ts}</span>
+    </div>
+    <div class="post-body">${esc(post.body)}</div>
+    <div class="post-actions">
+      <button class="action-btn like-btn ${post.likedByMe ? 'liked' : ''}" data-post="${post.id}">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="${post.likedByMe ? '#e03e3e' : 'none'}" stroke="${post.likedByMe ? '#e03e3e' : 'currentColor'}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
+        </svg>
+        <span class="like-count">${post.likeCount}</span>
+      </button>
+      <button class="action-btn comment-toggle-btn" data-post="${post.id}">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+        </svg>
+        <span class="comment-count">${post.commentCount}</span>
+      </button>
+    </div>
+    <div class="comments-section" id="comments-${post.id}">
+      <div class="comment-list" id="commentList-${post.id}">
+        ${renderComments(post.comments)}
+      </div>
+      <div class="comment-compose">
+        <div class="avatar sm" style="background:${avatarColor(userId)};color:#fff">${initials}</div>
+        <textarea class="comment-input" placeholder="Write a comment…" rows="1" data-post="${post.id}"></textarea>
+        <button class="btn-comment" data-post="${post.id}">Reply</button>
+      </div>
+    </div>
+  `
+
+  // Like
+  card.querySelector('.like-btn').addEventListener('click', () => toggleLike(post))
+
+  // Toggle comments
+  card.querySelector('.comment-toggle-btn').addEventListener('click', () => {
+    const section = card.querySelector('.comments-section')
+    section.classList.toggle('open')
+  })
+
+  // Submit comment
+  card.querySelector('.btn-comment').addEventListener('click', () => submitComment(post, card))
+
+  // Auto-expand textarea
+  card.querySelector('.comment-input').addEventListener('input', function() {
+    this.style.height = 'auto'
+    this.style.height = Math.min(this.scrollHeight, 120) + 'px'
+  })
+
+  return card
+}
+
+function renderComments(comments) {
+  if (!comments || !comments.length) return ''
+  return comments.map(c => `
+    <div class="comment-item">
+      <div class="avatar sm" style="background:${avatarColor(c.authorId)};color:#fff">${initials2(c.authorName)}</div>
+      <div class="comment-bubble">
+        <div class="comment-author">${esc(c.authorName)}</div>
+        <div class="comment-body">${esc(c.body)}</div>
+        <div class="comment-time">${relTime(c.timestamp)}</div>
+      </div>
+    </div>
+  `).join('')
+}
+
+// ── Like ──────────────────────────────────────────────────────
+async function toggleLike(post) {
+  const card = document.querySelector(`[data-id="${post.id}"]`)
+  const btn  = card.querySelector('.like-btn')
+  const countEl = btn.querySelector('.like-count')
+
+  // Optimistic update
+  const wasLiked = post.likedByMe
+  post.likedByMe  = !wasLiked
+  post.likeCount += wasLiked ? -1 : 1
+  countEl.textContent = post.likeCount
+  btn.classList.toggle('liked', post.likedByMe)
+  const svgPath = btn.querySelector('path')
+  svgPath.setAttribute('fill',   post.likedByMe ? '#e03e3e' : 'none')
+  svgPath.setAttribute('stroke', post.likedByMe ? '#e03e3e' : 'currentColor')
+
+  try {
+    await api({ action: 'toggleLike', postId: post.id, userId })
+  } catch(e) {
+    // revert
+    post.likedByMe  = wasLiked
+    post.likeCount += wasLiked ? 1 : -1
+    countEl.textContent = post.likeCount
+    btn.classList.toggle('liked', post.likedByMe)
+  }
+}
+
+// ── New post ──────────────────────────────────────────────────
+document.getElementById('postInput').addEventListener('input', function() {
+  const btn = document.getElementById('submitPost')
+  btn.disabled = !this.value.trim()
+  // auto-grow
+  this.style.height = 'auto'
+  this.style.height = this.scrollHeight + 'px'
+})
+
+document.getElementById('submitPost').addEventListener('click', async () => {
+  const input = document.getElementById('postInput')
+  const text  = input.value.trim()
+  if (!text) return
+
+  const btn = document.getElementById('submitPost')
+  btn.disabled = true
+  btn.textContent = 'Posting…'
+
+  try {
+    const result = await api({ action: 'createPost', authorId: userId, authorName: userName, text })
+    if (!result.ok) throw new Error(result.error)
+    posts.unshift(result.data)
+    renderFeed()
+    input.value = ''
+    input.style.height = ''
+    document.getElementById('emptyState').style.display = 'none'
+  } catch(e) {
+    const errEl = document.getElementById('postError')
+    errEl.textContent = 'Failed to post. Try again.'
+    errEl.style.display = 'block'
+    setTimeout(() => errEl.style.display = 'none', 3000)
+  } finally {
+    btn.disabled    = false
+    btn.textContent = 'Post'
+  }
+})
+
+// ── New comment ───────────────────────────────────────────────
+async function submitComment(post, card) {
+  const input = card.querySelector('.comment-input')
+  const text  = input.value.trim()
+  if (!text) return
+
+  const btn = card.querySelector('.btn-comment')
+  btn.disabled    = true
+  btn.textContent = '…'
+
+  try {
+    const result = await api({ action: 'addComment', postId: post.id, authorId: userId, authorName: userName, text })
+    if (!result.ok) throw new Error(result.error)
+
+    post.comments.push(result.data)
+    post.commentCount++
+
+    card.querySelector(`#commentList-${post.id}`).innerHTML = renderComments(post.comments)
+    card.querySelector('.comment-count').textContent = post.commentCount
+    input.value = ''
+    input.style.height = ''
+  } catch(e) {
+    // silent fail — user still sees their input
+  } finally {
+    btn.disabled    = false
+    btn.textContent = 'Reply'
+  }
+}
+
+// ── Back button ───────────────────────────────────────────────
+document.getElementById('backBtn').addEventListener('click', () => {
+  postToApp('QUIT', { completeState: 'COMPLETE' })
+})
+
+// ── Error state ───────────────────────────────────────────────
+function showError(msg) {
+  document.getElementById('feed').innerHTML = ''
+  document.getElementById('loadError').style.display = 'block'
+  if (msg) {
+    document.getElementById('loadError').innerHTML = `<div class="icon">⚠️</div>${msg}`
+  }
+}
+
+// ── Utilities ─────────────────────────────────────────────────
+function esc(str) {
+  return String(str || '')
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+    .replace(/"/g,'&quot;').replace(/\n/g,'<br>')
+}
+
+function initials2(name) {
+  return String(name || '?').split(' ').map(w => w[0]).join('').slice(0,2).toUpperCase()
+}
+
+function relTime(ts) {
+  if (!ts) return ''
+  const diff = (Date.now() - new Date(ts)) / 1000
+  if (diff < 60)   return 'just now'
+  if (diff < 3600) return Math.floor(diff/60) + 'm ago'
+  if (diff < 86400) return Math.floor(diff/3600) + 'h ago'
+  return Math.floor(diff/86400) + 'd ago'
+}
+
+const COLORS = ['#6366f1','#0ea5e9','#10b981','#f59e0b','#ef4444','#8b5cf6','#ec4899','#14b8a6']
+function avatarColor(id) {
+  let n = 0
+  for (let i = 0; i < (id||'').length; i++) n += id.charCodeAt(i)
+  return COLORS[n % COLORS.length]
+}
+</script>
+</body>
+</html>
