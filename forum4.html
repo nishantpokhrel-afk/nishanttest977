@@ -1,0 +1,1000 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Forum</title>
+<style>
+  /* ── Reset & base ── */
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --color-primary: #111111;
+    --color-primary-dark: #333333;
+    --color-primary-text: #ffffff;
+    --topbar-bg: #ffffff;
+    --topbar-border: #f0f0f0;
+  }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    background: #ffffff;
+    color: #1a1a1a;
+    min-height: 100vh;
+    padding: 100px 0;
+  }
+
+  /* ── Layout shell ── */
+  .shell {
+    max-width: 640px;
+    margin: 0 auto;
+    padding: 0 20px;
+  }
+
+  /* ── Top bar ── */
+  .topbar {
+    position: fixed;
+    top: 0; left: 0; right: 0;
+    height: 100px;
+    background: var(--topbar-bg, #ffffff);
+    border-bottom: 1px solid var(--topbar-border, #f0f0f0);
+    display: flex;
+    align-items: flex-end;
+    padding-bottom: 14px;
+    z-index: 100;
+  }
+  .topbar-inner {
+    max-width: 640px;
+    margin: 0 auto;
+    width: 100%;
+    padding: 0 20px;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+  }
+  .back-btn {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    background: none;
+    border: 1px solid #e5e5e5;
+    border-radius: 8px;
+    padding: 7px 12px;
+    font-size: 13px;
+    font-weight: 500;
+    color: #555;
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s;
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+  .back-btn:hover { background: #f7f7f7; color: var(--color-primary, #111); }
+  .back-btn svg { flex-shrink: 0; }
+  .topbar-title {
+    font-size: 17px;
+    font-weight: 650;
+    color: var(--color-primary, #111);
+    letter-spacing: -0.3px;
+  }
+
+  /* ── Bottom spacer bar ── */
+  .bottombar {
+    position: fixed;
+    bottom: 0; left: 0; right: 0;
+    height: 100px;
+    background: linear-gradient(to top, #ffffff 60%, transparent);
+    pointer-events: none;
+    z-index: 50;
+  }
+
+  /* ── Compose box ── */
+  .compose {
+    background: #fafafa;
+    border: 1px solid #ebebeb;
+    border-radius: 14px;
+    padding: 16px;
+    margin-bottom: 24px;
+  }
+  .compose-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 12px;
+  }
+  .avatar {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background: #e8e8e8;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 13px;
+    font-weight: 600;
+    color: #555;
+    flex-shrink: 0;
+    text-transform: uppercase;
+  }
+  .avatar.sm {
+    width: 28px;
+    height: 28px;
+    font-size: 11px;
+  }
+  .compose-name {
+    font-size: 13px;
+    font-weight: 600;
+    color: #111;
+  }
+  .compose textarea {
+    width: 100%;
+    border: none;
+    background: transparent;
+    resize: none;
+    font-size: 14px;
+    line-height: 1.5;
+    color: #222;
+    outline: none;
+    min-height: 64px;
+    font-family: inherit;
+  }
+  .compose textarea::placeholder { color: #bbb; }
+  .compose-footer {
+    display: flex;
+    justify-content: flex-end;
+    margin-top: 10px;
+  }
+  .btn-post {
+    background: #111;
+    color: #fff;
+    border: none;
+    border-radius: 8px;
+    padding: 8px 18px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.15s, opacity 0.15s;
+  }
+  .btn-post:hover { background: #333; }
+  .btn-post:disabled { opacity: 0.35; cursor: not-allowed; }
+
+  /* ── Feed ── */
+  .feed { display: flex; flex-direction: column; gap: 16px; }
+
+  /* ── Post card ── */
+  .post-card {
+    background: #fff;
+    border: 1px solid #ebebeb;
+    border-radius: 14px;
+    padding: 18px 18px 14px;
+    transition: border-color 0.15s;
+  }
+  .post-card:hover { border-color: #d8d8d8; }
+  .post-meta {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 12px;
+  }
+  .post-author { font-size: 13px; font-weight: 600; color: #111; }
+  .post-time   { font-size: 12px; color: #aaa; margin-left: auto; }
+  .post-body   { font-size: 14px; line-height: 1.6; color: #333; margin-bottom: 14px; }
+  .post-body a, .comment-body a {
+    color: #6366f1;
+    text-decoration: underline;
+    text-underline-offset: 2px;
+    word-break: break-all;
+  }
+  .post-body a:hover, .comment-body a:hover { color: #4338ca; }
+
+  /* ── Actions row ── */
+  .post-actions {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    border-top: 1px solid #f3f3f3;
+    padding-top: 12px;
+  }
+  .action-btn {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    background: none;
+    border: none;
+    padding: 6px 10px;
+    border-radius: 8px;
+    font-size: 13px;
+    color: #888;
+    cursor: pointer;
+    transition: background 0.12s, color 0.12s;
+    font-family: inherit;
+  }
+  .action-btn:hover { background: #f5f5f5; color: #333; }
+  .action-btn.liked { color: #e03e3e; }
+  .action-btn.liked svg { fill: #e03e3e; stroke: #e03e3e; }
+  .action-btn svg { transition: fill 0.12s, stroke 0.12s; }
+  .action-btn.delete-btn { margin-left: auto; }
+  .action-btn.delete-btn:hover { background: #fff0f0; color: #e03e3e; }
+  .comment-delete-btn {
+    background: none;
+    border: none;
+    padding: 3px 6px;
+    border-radius: 6px;
+    cursor: pointer;
+    color: #ccc;
+    line-height: 1;
+    transition: color 0.12s, background 0.12s;
+    flex-shrink: 0;
+    align-self: flex-start;
+    margin-top: 4px;
+  }
+  .comment-delete-btn:hover { color: #e03e3e; background: #fff0f0; }
+
+  /* ── Comments section ── */
+  .comments-section {
+    margin-top: 14px;
+    display: none;
+    flex-direction: column;
+    gap: 0;
+  }
+  .comments-section.open { display: flex; }
+
+  .comment-list { display: flex; flex-direction: column; gap: 10px; margin-bottom: 12px; }
+  .comment-item {
+    display: flex;
+    gap: 9px;
+    align-items: flex-start;
+  }
+  .comment-bubble {
+    background: #f7f7f7;
+    border-radius: 10px;
+    padding: 8px 11px;
+    flex: 1;
+  }
+  .comment-author { font-size: 12px; font-weight: 600; color: #111; margin-bottom: 2px; }
+  .comment-body   { font-size: 13px; color: #444; line-height: 1.45; }
+  .comment-time   { font-size: 11px; color: #bbb; margin-top: 3px; }
+
+  .comment-compose {
+    display: flex;
+    gap: 8px;
+    align-items: flex-end;
+  }
+  .comment-input {
+    flex: 1;
+    border: 1px solid #e5e5e5;
+    border-radius: 10px;
+    padding: 8px 12px;
+    font-size: 13px;
+    font-family: inherit;
+    color: #222;
+    outline: none;
+    resize: none;
+    min-height: 38px;
+    max-height: 120px;
+    line-height: 1.4;
+    transition: border-color 0.15s;
+  }
+  .comment-input:focus { border-color: #bbb; }
+  .comment-input::placeholder { color: #bbb; }
+  .btn-comment {
+    background: var(--color-primary, #111);
+    color: var(--color-primary-text, #fff);
+    border: none;
+    border-radius: 8px;
+    padding: 8px 14px;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    white-space: nowrap;
+    flex-shrink: 0;
+    transition: background 0.15s, opacity 0.15s;
+    font-family: inherit;
+  }
+  .btn-comment:hover { background: var(--color-primary-dark, #333); }
+  .btn-comment:disabled { opacity: 0.35; cursor: not-allowed; }
+
+  /* ── States ── */
+  .state-msg {
+    text-align: center;
+    padding: 48px 0;
+    color: #bbb;
+    font-size: 14px;
+  }
+  .state-msg .icon { font-size: 28px; margin-bottom: 8px; }
+  .error-msg { color: #d44; font-size: 13px; margin-top: 6px; }
+
+  /* ── Loading skeleton ── */
+  .skeleton { animation: pulse 1.4s ease-in-out infinite; }
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50%       { opacity: 0.4; }
+  }
+  .skel-card {
+    background: #f5f5f5;
+    border-radius: 14px;
+    height: 120px;
+    margin-bottom: 16px;
+  }
+
+  /* ── Confirm modal ── */
+  .confirm-backdrop {
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,0.18);
+    z-index: 200;
+    display: flex; align-items: center; justify-content: center;
+    padding: 24px;
+  }
+  .confirm-box {
+    background: #fff;
+    border-radius: 14px;
+    padding: 24px 20px 18px;
+    max-width: 320px;
+    width: 100%;
+    box-shadow: 0 8px 40px rgba(0,0,0,0.14);
+  }
+  .confirm-box p { font-size: 14px; color: #333; line-height: 1.5; margin-bottom: 18px; }
+  .confirm-actions { display: flex; gap: 8px; justify-content: flex-end; }
+  .btn-cancel {
+    background: #f3f3f3; border: none; border-radius: 8px;
+    padding: 8px 16px; font-size: 13px; font-weight: 500;
+    color: #555; cursor: pointer; font-family: inherit;
+  }
+  .btn-cancel:hover { background: #e8e8e8; }
+  .btn-danger {
+    background: #e03e3e; border: none; border-radius: 8px;
+    padding: 8px 16px; font-size: 13px; font-weight: 600;
+    color: #fff; cursor: pointer; font-family: inherit;
+  }
+  .btn-danger:hover { background: #c53030; }
+
+  /* ── Toast ── */
+  .toast {
+    position: fixed; bottom: 110px; left: 50%; transform: translateX(-50%);
+    background: #333; color: #fff; font-size: 13px;
+    padding: 9px 18px; border-radius: 20px;
+    z-index: 300; opacity: 0; transition: opacity 0.2s;
+    white-space: nowrap; pointer-events: none;
+  }
+  .toast.show { opacity: 1; }
+</style>
+</head>
+<body>
+
+<!-- Fixed top bar -->
+<div class="topbar">
+  <div class="topbar-inner">
+    <button class="back-btn" id="backBtn">
+      <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M9 2L4 7l5 5"/>
+      </svg>
+      Back
+    </button>
+    <span class="topbar-title" id="pageTitle">Forum</span>
+  </div>
+</div>
+
+<!-- Fixed bottom fade -->
+<div class="bottombar"></div>
+
+<!-- Main content -->
+<div class="shell">
+
+  <!-- Compose -->
+  <div class="compose" id="compose">
+    <div class="compose-header">
+      <div class="avatar" id="composeAvatar">?</div>
+      <span class="compose-name" id="composeName">Loading…</span>
+    </div>
+    <textarea id="postInput" placeholder="Share something with the community…" rows="3"></textarea>
+    <div class="compose-footer">
+      <div>
+        <button class="btn-post" id="submitPost" disabled>Post</button>
+        <div class="error-msg" id="postError" style="display:none"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Feed -->
+  <div id="feed" class="feed">
+    <div class="skel-card skeleton"></div>
+    <div class="skel-card skeleton"></div>
+    <div class="skel-card skeleton"></div>
+  </div>
+
+  <div id="emptyState" class="state-msg" style="display:none">
+    <div class="icon">💬</div>
+    Be the first to post something.
+  </div>
+
+  <div id="loadError" class="state-msg" style="display:none">
+    <div class="icon">⚠️</div>
+    Couldn't load posts. Check the API URL in CONFIG.
+  </div>
+
+</div>
+
+<!-- Confirm modal -->
+<div class="confirm-backdrop" id="confirmBackdrop" style="display:none">
+  <div class="confirm-box">
+    <p id="confirmMsg">Are you sure?</p>
+    <div class="confirm-actions">
+      <button class="btn-cancel" id="confirmCancel">Cancel</button>
+      <button class="btn-danger" id="confirmOk">Delete</button>
+    </div>
+  </div>
+</div>
+
+<!-- Toast -->
+<div class="toast" id="toast"></div>
+
+<script>
+// ── Bridge ────────────────────────────────────────────────────
+const isNative = typeof window.ReactNativeWebView !== 'undefined'
+
+function postToApp(key, data = null) {
+  const text = JSON.stringify({ key, data })
+  if (isNative) window.ReactNativeWebView.postMessage(text)
+  else window.parent.postMessage(text, '*')
+}
+
+// ── State ─────────────────────────────────────────────────────
+const state = {}
+const REQUIRED = ['API', 'USER', 'AUTH', 'ACTIVITY', 'ACTIVITY_RESPONSE', 'CONFIG']
+let posts   = []
+let apiUrl  = ''         // set from state.CONFIG.appsScriptUrl
+let userId  = ''
+let userName = ''
+let initials = ''
+
+// ── Init messages ─────────────────────────────────────────────
+function onMessage(event) {
+  try {
+    const msg = JSON.parse(event.data)
+    if (!msg || !msg.key) return
+    handleMessage(msg)
+  } catch(e) {}
+}
+document.addEventListener('message', onMessage)
+window.addEventListener('message',   onMessage)
+
+window.addEventListener('load', () => postToApp('READY_DYNAMIC_MEDIA'))
+
+// ── Start ─────────────────────────────────────────────────────
+function startTemplate() {
+  apiUrl = (state.CONFIG && state.CONFIG.appsScriptUrl) || ''
+
+  const u = state.USER || {}
+  userId   = u.id || u._id || 'anon-' + Math.random().toString(36).slice(2,8)
+
+  // Log the full USER object so you can see what fields Cogniss sends
+  console.log('[Forum] USER object:', JSON.stringify(u))
+
+  // Try every known Cogniss field name for a display name
+  userName = u.displayName
+    || u.display_name
+    || u.name
+    || u.fullName
+    || u.full_name
+    || [u.firstName, u.lastName].filter(Boolean).join(' ')
+    || [u.first_name, u.last_name].filter(Boolean).join(' ')
+    || u.username
+    || u.email
+    || 'Anonymous'
+
+  initials = userName.split(' ').map(w => w[0]).join('').slice(0,2).toUpperCase()
+
+  // Set activity name as page title
+  const activityName = (state.ACTIVITY && state.ACTIVITY.name) || 'Forum'
+  document.getElementById('pageTitle').textContent = activityName
+  document.title = activityName
+
+  document.getElementById('composeAvatar').textContent = initials
+  document.getElementById('composeName').textContent   = userName
+  document.getElementById('submitPost').disabled       = false
+
+  // Apply app theme (runs async, UI already visible with defaults)
+  applyTheme()
+
+  if (!apiUrl) {
+    showError('appsScriptUrl is not set in CONFIG. Add it via the Creator tool.')
+    return
+  }
+
+  // Fix any of this user's past posts/comments that were saved as Anonymous
+  if (userName !== 'Anonymous') {
+    api({ action: 'updateDisplayName', userId, displayName: userName }).catch(() => {})
+  }
+
+  loadPosts()
+}
+
+// ── Theme ──────────────────────────────────────────────────────
+// Fetches App + platform theme via REST_REQUEST and applies as
+// CSS custom properties so buttons and topbar match the app's brand.
+let _reqId = 0
+const _pending = {}
+
+function restRequest(method, model, data) {
+  return new Promise((resolve, reject) => {
+    const id   = 'r' + (++_reqId)
+    _pending[id] = { resolve, reject }
+    const msg  = JSON.stringify({ key: 'REST_REQUEST', method, model, data, id, specialParams: null })
+    if (isNative) window.ReactNativeWebView.postMessage(msg)
+    else window.parent.postMessage(msg, '*')
+  })
+}
+
+// Hook REQUEST_RESPONSE into the existing message handler
+function handleMessage(message) {
+  if (message.key === 'REQUEST_RESPONSE') {
+    const p = _pending[message.id]
+    if (p) {
+      delete _pending[message.id]
+      message.error ? p.reject(new Error(message.error)) : p.resolve(message.data)
+    }
+    return
+  }
+  // Collect init messages into state
+  state[message.key] = message.data
+  if (!started && REQUIRED.every(k => state[k] !== undefined)) {
+    started = true
+    startTemplate()
+  }
+}
+
+function luminance(hex) {
+  // Returns 0 (dark) to 1 (light) — used to decide text colour on primary bg
+  const h = hex.replace('#','')
+  const r = parseInt(h.slice(0,2),16)/255
+  const g = parseInt(h.slice(2,4),16)/255
+  const b = parseInt(h.slice(4,6),16)/255
+  const toLinear = c => c <= 0.03928 ? c/12.92 : Math.pow((c+0.055)/1.055, 2.4)
+  return 0.2126*toLinear(r) + 0.7152*toLinear(g) + 0.0722*toLinear(b)
+}
+
+function darken(hex, amount) {
+  // Darken a hex colour by reducing each channel
+  const h = hex.replace('#','')
+  const r = Math.max(0, parseInt(h.slice(0,2),16) - amount)
+  const g = Math.max(0, parseInt(h.slice(2,4),16) - amount)
+  const b = Math.max(0, parseInt(h.slice(4,6),16) - amount)
+  return '#' + [r,g,b].map(v => v.toString(16).padStart(2,'0')).join('')
+}
+
+async function applyTheme() {
+  try {
+    const appId = state.ACTIVITY_RESPONSE && state.ACTIVITY_RESPONSE.app
+    if (!appId) return
+
+    // Fetch App and Settings in parallel
+    const [appRec, settingsRes] = await Promise.all([
+      restRequest('get',  'App',      appId),
+      restRequest('list', 'Settings', {})
+    ])
+
+    const appTheme      = (appRec && appRec.theme)                       || {}
+    const platformTheme = (settingsRes && settingsRes.items && settingsRes.items[0] && settingsRes.items[0].theme) || {}
+
+    // Merge — App wins
+    const colors = Object.assign({}, platformTheme.colors, appTheme.colors)
+    const activityHeader = appTheme.activityHeader || platformTheme.activityHeader
+
+    const root = document.documentElement
+
+    if (colors.primary) {
+      root.style.setProperty('--color-primary',      colors.primary)
+      root.style.setProperty('--color-primary-dark', darken(colors.primary, 30))
+      // Auto-pick white or dark text based on luminance
+      const textColor = luminance(colors.primary) > 0.35 ? '#111111' : '#ffffff'
+      root.style.setProperty('--color-primary-text', textColor)
+    }
+
+    // Topbar background from activityHeader or appHeader
+    const headerColor = (activityHeader && activityHeader.color)
+      || (appTheme.appHeader && appTheme.appHeader.color)
+      || (platformTheme.appHeader && platformTheme.appHeader.color)
+    if (headerColor) {
+      root.style.setProperty('--topbar-bg',     headerColor)
+      root.style.setProperty('--topbar-border', darken(headerColor, 15))
+      // Title colour contrasts with header bg
+      const titleColor = luminance(headerColor) > 0.35 ? '#111111' : '#ffffff'
+      root.style.setProperty('--title-color', titleColor)
+      document.querySelector('.topbar-title').style.color = titleColor
+      document.querySelector('.back-btn').style.color = titleColor
+      document.querySelector('.back-btn').style.borderColor = titleColor + '44'
+    }
+
+    // Border radius
+    const radiusMap = { NONE: '0px', SMALL: '4px', MEDIUM: '8px', LARGE: '16px', FULL: '9999px' }
+    const rounded = appTheme.rounded || platformTheme.rounded
+    if (rounded && radiusMap[rounded]) {
+      root.style.setProperty('--border-radius', radiusMap[rounded])
+      // Apply to buttons
+      document.querySelectorAll('.btn-post, .btn-comment, .back-btn, .btn-cancel, .btn-danger').forEach(el => {
+        el.style.borderRadius = radiusMap[rounded]
+      })
+    }
+
+  } catch(e) {
+    console.log('[Forum] Theme load failed (non-fatal):', e.message)
+  }
+}
+
+// ── API via JSONP (the only way to avoid CORS on Apps Script) ─
+// Apps Script does not support custom response headers, so we
+// inject a <script> tag with a ?callback= param — the server
+// wraps JSON in the callback function, bypassing CORS entirely.
+// All writes (createPost, toggleLike, addComment) are also GET.
+let _cbId = 0
+function api(params) {
+  return new Promise((resolve, reject) => {
+    const cbName = '_fc' + (++_cbId)
+    const timer  = setTimeout(() => {
+      delete window[cbName]
+      reject(new Error('Timed out'))
+    }, 12000)
+
+    window[cbName] = function(data) {
+      clearTimeout(timer)
+      delete window[cbName]
+      if (tag.parentNode) tag.parentNode.removeChild(tag)
+      resolve(data)
+    }
+
+    const qs  = Object.keys(params).map(k =>
+      encodeURIComponent(k) + '=' + encodeURIComponent(params[k])
+    ).join('&')
+
+    const tag = document.createElement('script')
+    tag.src = apiUrl + '?' + qs + '&callback=' + cbName
+    tag.onerror = () => {
+      clearTimeout(timer)
+      delete window[cbName]
+      reject(new Error('Script load failed'))
+    }
+    document.head.appendChild(tag)
+  })
+}
+
+// ── Load posts ────────────────────────────────────────────────
+async function loadPosts() {
+  try {
+    const result = await api({ action: 'getPosts', userId })
+    if (!result.ok) throw new Error(result.error)
+    posts = result.data
+    renderFeed()
+  } catch(e) {
+    showError(null)
+  }
+}
+
+// ── Render feed ───────────────────────────────────────────────
+function renderFeed() {
+  const feed = document.getElementById('feed')
+  feed.innerHTML = ''
+  document.getElementById('emptyState').style.display = posts.length ? 'none' : 'block'
+  document.getElementById('loadError').style.display  = 'none'
+  posts.forEach(post => feed.appendChild(makePostCard(post)))
+}
+
+// Event delegation for dynamically rendered comment delete buttons
+document.getElementById('feed').addEventListener('click', function(e) {
+  const btn = e.target.closest('.comment-delete-btn')
+  if (!btn) return
+  const commentId = btn.dataset.commentId
+  const postId    = btn.dataset.postId
+  deleteComment(commentId, postId, btn)
+})
+
+function makePostCard(post) {
+  const card = document.createElement('div')
+  card.className = 'post-card'
+  card.dataset.id = post.id
+
+  const av = initials2(post.authorName)
+  const ts = relTime(post.timestamp)
+
+  card.innerHTML = `
+    <div class="post-meta">
+      <div class="avatar" style="background:${avatarColor(post.authorId)};color:#fff">${av}</div>
+      <span class="post-author">${esc(post.authorName)}</span>
+      <span class="post-time">${ts}</span>
+    </div>
+    <div class="post-body">${linkify(post.body)}</div>
+    <div class="post-actions">
+      <button class="action-btn like-btn ${post.likedByMe ? 'liked' : ''}" data-post="${post.id}">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="${post.likedByMe ? '#e03e3e' : 'none'}" stroke="${post.likedByMe ? '#e03e3e' : 'currentColor'}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
+        </svg>
+        <span class="like-count">${post.likeCount}</span>
+      </button>
+      <button class="action-btn comment-toggle-btn" data-post="${post.id}">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+        </svg>
+        <span class="comment-count">${post.commentCount}</span>
+      </button>
+      ${post.authorId === userId ? `
+      <button class="action-btn delete-btn" title="Delete post">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4h6v2"/>
+        </svg>
+        Delete
+      </button>` : ''}
+    </div>
+    <div class="comments-section" id="comments-${post.id}">
+      <div class="comment-list" id="commentList-${post.id}">
+        ${renderComments(post.comments, post.id)}
+      </div>
+      <div class="comment-compose">
+        <div class="avatar sm" style="background:${avatarColor(userId)};color:#fff">${initials}</div>
+        <textarea class="comment-input" placeholder="Write a comment…" rows="1" data-post="${post.id}"></textarea>
+        <button class="btn-comment" data-post="${post.id}">Reply</button>
+      </div>
+    </div>
+  `
+
+  // Like
+  card.querySelector('.like-btn').addEventListener('click', () => toggleLike(post))
+
+  // Toggle comments
+  card.querySelector('.comment-toggle-btn').addEventListener('click', () => {
+    const section = card.querySelector('.comments-section')
+    section.classList.toggle('open')
+  })
+
+  // Submit comment
+  card.querySelector('.btn-comment').addEventListener('click', () => submitComment(post, card))
+
+  // Delete post (only rendered for own posts)
+  const deleteBtn = card.querySelector('.delete-btn')
+  if (deleteBtn) deleteBtn.addEventListener('click', () => deletePost(post, card))
+
+  // Auto-expand textarea
+  card.querySelector('.comment-input').addEventListener('input', function() {
+    this.style.height = 'auto'
+    this.style.height = Math.min(this.scrollHeight, 120) + 'px'
+  })
+
+  return card
+}
+
+function renderComments(comments, postId) {
+  if (!comments || !comments.length) return ''
+  return comments.map(c => `
+    <div class="comment-item" data-comment-id="${c.id}">
+      <div class="avatar sm" style="background:${avatarColor(c.authorId)};color:#fff">${initials2(c.authorName)}</div>
+      <div class="comment-bubble">
+        <div class="comment-author">${esc(c.authorName)}</div>
+        <div class="comment-body">${linkify(c.body)}</div>
+        <div class="comment-time">${relTime(c.timestamp)}</div>
+      </div>
+      ${c.authorId === userId ? `
+      <button class="comment-delete-btn" title="Delete comment" data-comment-id="${c.id}" data-post-id="${postId}">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M9 6V4h6v2"/>
+        </svg>
+      </button>` : ''}
+    </div>
+  `).join('')
+}
+
+// ── Like ──────────────────────────────────────────────────────
+async function toggleLike(post) {
+  const card = document.querySelector(`[data-id="${post.id}"]`)
+  const btn  = card.querySelector('.like-btn')
+  const countEl = btn.querySelector('.like-count')
+
+  // Optimistic update
+  const wasLiked = post.likedByMe
+  post.likedByMe  = !wasLiked
+  post.likeCount += wasLiked ? -1 : 1
+  countEl.textContent = post.likeCount
+  btn.classList.toggle('liked', post.likedByMe)
+  const svgPath = btn.querySelector('path')
+  svgPath.setAttribute('fill',   post.likedByMe ? '#e03e3e' : 'none')
+  svgPath.setAttribute('stroke', post.likedByMe ? '#e03e3e' : 'currentColor')
+
+  try {
+    await api({ action: 'toggleLike', postId: post.id, userId })
+  } catch(e) {
+    // revert
+    post.likedByMe  = wasLiked
+    post.likeCount += wasLiked ? 1 : -1
+    countEl.textContent = post.likeCount
+    btn.classList.toggle('liked', post.likedByMe)
+  }
+}
+
+// ── New post ──────────────────────────────────────────────────
+document.getElementById('postInput').addEventListener('input', function() {
+  const btn = document.getElementById('submitPost')
+  btn.disabled = !this.value.trim()
+  // auto-grow
+  this.style.height = 'auto'
+  this.style.height = this.scrollHeight + 'px'
+})
+
+document.getElementById('submitPost').addEventListener('click', async () => {
+  const input = document.getElementById('postInput')
+  const text  = input.value.trim()
+  if (!text) return
+
+  const btn = document.getElementById('submitPost')
+  btn.disabled = true
+  btn.textContent = 'Posting…'
+
+  try {
+    const result = await api({ action: 'createPost', authorId: userId, authorName: userName, text })
+    if (!result.ok) throw new Error(result.error)
+    posts.unshift(result.data)
+    renderFeed()
+    input.value = ''
+    input.style.height = ''
+    document.getElementById('emptyState').style.display = 'none'
+  } catch(e) {
+    const errEl = document.getElementById('postError')
+    errEl.textContent = 'Failed to post. Try again.'
+    errEl.style.display = 'block'
+    setTimeout(() => errEl.style.display = 'none', 3000)
+  } finally {
+    btn.disabled    = false
+    btn.textContent = 'Post'
+  }
+})
+
+// ── New comment ───────────────────────────────────────────────
+async function submitComment(post, card) {
+  const input = card.querySelector('.comment-input')
+  const text  = input.value.trim()
+  if (!text) return
+
+  const btn = card.querySelector('.btn-comment')
+  btn.disabled    = true
+  btn.textContent = '…'
+
+  try {
+    const result = await api({ action: 'addComment', postId: post.id, authorId: userId, authorName: userName, text })
+    if (!result.ok) throw new Error(result.error)
+
+    post.comments.push(result.data)
+    post.commentCount++
+
+    card.querySelector(`#commentList-${post.id}`).innerHTML = renderComments(post.comments, post.id)
+    card.querySelector('.comment-count').textContent = post.commentCount
+    input.value = ''
+    input.style.height = ''
+  } catch(e) {
+    // silent fail — user still sees their input
+  } finally {
+    btn.disabled    = false
+    btn.textContent = 'Reply'
+  }
+}
+
+// ── Delete post ───────────────────────────────────────────────
+// ── Confirm modal (replaces native confirm() which CSP blocks) ─
+function showConfirm(message) {
+  return new Promise(resolve => {
+    const backdrop = document.getElementById('confirmBackdrop')
+    document.getElementById('confirmMsg').textContent = message
+    backdrop.style.display = 'flex'
+    const ok     = document.getElementById('confirmOk')
+    const cancel = document.getElementById('confirmCancel')
+    function cleanup(val) {
+      backdrop.style.display = 'none'
+      ok.replaceWith(ok.cloneNode(true))
+      cancel.replaceWith(cancel.cloneNode(true))
+      resolve(val)
+    }
+    document.getElementById('confirmOk').addEventListener('click',    () => cleanup(true))
+    document.getElementById('confirmCancel').addEventListener('click', () => cleanup(false))
+    backdrop.addEventListener('click', e => { if (e.target === backdrop) cleanup(false) })
+  })
+}
+
+function showToast(msg) {
+  const t = document.getElementById('toast')
+  t.textContent = msg
+  t.classList.add('show')
+  setTimeout(() => t.classList.remove('show'), 2800)
+}
+
+async function deletePost(post, card) {
+  const ok = await showConfirm('Delete this post? This cannot be undone.')
+  if (!ok) return
+  card.style.opacity = '0.4'
+  card.style.pointerEvents = 'none'
+  try {
+    const result = await api({ action: 'deletePost', postId: post.id, userId })
+    if (!result.ok) throw new Error(result.error)
+    posts = posts.filter(p => p.id !== post.id)
+    card.remove()
+    showToast('Post deleted')
+    if (!posts.length) document.getElementById('emptyState').style.display = 'block'
+  } catch(e) {
+    card.style.opacity = ''
+    card.style.pointerEvents = ''
+    showToast('Could not delete post. Try again.')
+  }
+}
+
+// ── Delete comment ─────────────────────────────────────────────
+async function deleteComment(commentId, postId, btn) {
+  const confirmed = await showConfirm('Delete this comment?')
+  if (!confirmed) return
+  const item = btn.closest('.comment-item')
+  item.style.opacity = '0.4'
+  item.style.pointerEvents = 'none'
+  try {
+    const result = await api({ action: 'deleteComment', commentId, userId })
+    if (!result.ok) throw new Error(result.error)
+    const post = posts.find(p => p.id === postId)
+    if (post) {
+      post.comments = post.comments.filter(c => c.id !== commentId)
+      post.commentCount = Math.max(0, post.commentCount - 1)
+      const card = document.querySelector(`[data-id="${postId}"]`)
+      if (card) card.querySelector('.comment-count').textContent = post.commentCount
+    }
+    item.remove()
+    showToast('Comment deleted')
+  } catch(e) {
+    item.style.opacity = ''
+    item.style.pointerEvents = ''
+    showToast('Could not delete comment. Try again.')
+  }
+}
+
+// ── Back button ───────────────────────────────────────────────
+document.getElementById('backBtn').addEventListener('click', () => {
+  postToApp('QUIT', { completeState: 'COMPLETE' })
+})
+
+// ── Error state ───────────────────────────────────────────────
+function showError(msg) {
+  document.getElementById('feed').innerHTML = ''
+  document.getElementById('loadError').style.display = 'block'
+  if (msg) {
+    document.getElementById('loadError').innerHTML = `<div class="icon">⚠️</div>${msg}`
+  }
+}
+
+// ── Utilities ─────────────────────────────────────────────────
+function esc(str) {
+  return String(str || '')
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+    .replace(/"/g,'&quot;').replace(/\n/g,'<br>')
+}
+
+// Like esc() but also wraps URLs in <a> tags.
+// Safe: escapes HTML first, then replaces URL patterns in the escaped string.
+function linkify(str) {
+  const escaped = esc(str)
+  return escaped.replace(
+    /(https?:\/\/[^\s<>"]+)/g,
+    '<a href="$1" target="_blank" rel="noopener noreferrer">$1</a>'
+  )
+}
+
+function initials2(name) {
+  return String(name || '?').split(' ').map(w => w[0]).join('').slice(0,2).toUpperCase()
+}
+
+function relTime(ts) {
+  if (!ts) return ''
+  const diff = (Date.now() - new Date(ts)) / 1000
+  if (diff < 60)   return 'just now'
+  if (diff < 3600) return Math.floor(diff/60) + 'm ago'
+  if (diff < 86400) return Math.floor(diff/3600) + 'h ago'
+  return Math.floor(diff/86400) + 'd ago'
+}
+
+const COLORS = ['#6366f1','#0ea5e9','#10b981','#f59e0b','#ef4444','#8b5cf6','#ec4899','#14b8a6']
+function avatarColor(id) {
+  let n = 0
+  for (let i = 0; i < (id||'').length; i++) n += id.charCodeAt(i)
+  return COLORS[n % COLORS.length]
+}
+</script>
+</body>
+</html>
