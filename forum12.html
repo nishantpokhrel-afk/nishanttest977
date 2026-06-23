@@ -1,0 +1,1431 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Forum</title>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --primary: #111111;
+  --primary-dark: #333333;
+  --primary-text: #ffffff;
+  --topbar-bg: #f0f0f0;
+  --topbar-border: #d8d8d8;
+  --radius: 8px;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  background: #ffffff;
+  color: #1a1a1a;
+  min-height: 100vh;
+  padding: 120px 0 120px;
+}
+
+/* ── Top bar ── */
+.topbar {
+  position: fixed;
+  top: 0; left: 0; right: 0;
+  height: 120px;
+  background: var(--topbar-bg);
+  border-bottom: 1px solid var(--topbar-border);
+  display: flex;
+  align-items: flex-end;
+  padding-bottom: 14px;
+  z-index: 100;
+}
+.topbar-inner {
+  max-width: 640px;
+  margin: 0 auto;
+  width: 100%;
+  padding: 0 20px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  position: relative;
+}
+.back-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: 1px solid #d8d8d8;
+  border-radius: 50%;
+  width: 36px;
+  height: 36px;
+  color: #555;
+  cursor: pointer;
+  font-family: inherit;
+  flex-shrink: 0;
+  transition: background 0.15s;
+}
+.back-btn:hover { background: rgba(0,0,0,0.07); }
+.topbar-title {
+  font-size: 17px;
+  font-weight: 700;
+  color: #111;
+  letter-spacing: -0.3px;
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  white-space: nowrap;
+}
+
+/* ── Bottom fade ── */
+.bottombar {
+  position: fixed;
+  bottom: 0; left: 0; right: 0;
+  height: 120px;
+  background: transparent;
+  border-top: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 20px 20px;
+  z-index: 50;
+}
+.bottombar-inner {
+  max-width: 640px;
+  width: 100%;
+  display: flex;
+  justify-content: center;
+}
+.btn-new-post {
+  width: auto;
+  background: var(--primary, #111);
+  color: var(--primary-text, #fff);
+  border: none;
+  border-radius: var(--radius, 8px);
+  padding: 12px 24px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: inherit;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  transition: opacity 0.15s;
+  white-space: nowrap;
+}
+.btn-new-post:hover { opacity: 0.85; }
+
+/* ── Shell ── */
+.shell {
+  max-width: 640px;
+  margin: 0 auto;
+  padding: 24px 20px 0;
+}
+
+/* ── Compose ── */
+.compose-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+.avatar {
+  width: 36px; height: 36px;
+  border-radius: 50%;
+  background: #e8e8e8;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 13px; font-weight: 600;
+  color: #fff;
+  flex-shrink: 0;
+  text-transform: uppercase;
+  overflow: hidden;
+  position: relative;
+}
+.avatar.sm { width: 28px; height: 28px; font-size: 11px; }
+.avatar img {
+  position: absolute; inset: 0;
+  width: 100%; height: 100%;
+  object-fit: cover;
+  border-radius: 50%;
+}
+.compose-name { font-size: 13px; font-weight: 600; color: #111; }
+.compose textarea {
+  width: 100%;
+  border: none;
+  background: transparent;
+  resize: none;
+  font-size: 14px;
+  line-height: 1.5;
+  color: #222;
+  outline: none;
+  min-height: 64px;
+  font-family: inherit;
+}
+.compose textarea::placeholder { color: #bbb; }
+.compose-footer {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  margin-top: 10px;
+}
+.error-msg { color: #d44; font-size: 13px; }
+
+/* ── Buttons ── */
+.btn-post, .btn-comment {
+  background: var(--primary);
+  color: var(--primary-text);
+  border: none;
+  border-radius: var(--radius);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: inherit;
+  transition: opacity 0.15s;
+}
+.btn-post { padding: 8px 18px; }
+.btn-comment { padding: 8px 14px; font-size: 12px; white-space: nowrap; flex-shrink: 0; }
+.btn-post:hover, .btn-comment:hover { opacity: 0.85; }
+.btn-post:disabled, .btn-comment:disabled { opacity: 0.35; cursor: not-allowed; }
+
+/* ── Feed ── */
+.feed { display: flex; flex-direction: column; gap: 16px; }
+
+/* ── Post card ── */
+.post-card {
+  background: #fff;
+  border: 1px solid #ebebeb;
+  border-radius: 14px;
+  padding: 18px 18px 14px;
+}
+.post-meta {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+.post-author { font-size: 13px; font-weight: 600; color: #111; }
+.post-time { font-size: 12px; color: #aaa; margin-left: auto; }
+.post-body { font-size: 14px; line-height: 1.6; color: #333; margin-bottom: 14px; word-break: break-word; }
+.post-body a, .comment-body a { color: #6366f1; text-decoration: underline; text-underline-offset: 2px; word-break: break-all; }
+
+/* ── Actions ── */
+.post-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  border-top: 1px solid #f3f3f3;
+  padding-top: 12px;
+}
+.action-btn {
+  display: flex; align-items: center; gap: 5px;
+  background: none; border: none;
+  padding: 6px 10px; border-radius: var(--radius);
+  font-size: 13px; color: #888;
+  cursor: pointer; font-family: inherit;
+}
+.action-btn:hover { background: #f5f5f5; color: #333; }
+.action-btn.liked { color: #e03e3e; }
+.action-btn .heart-icon {
+  transition: transform 0.15s cubic-bezier(0.175, 0.885, 0.32, 1.275), fill 0.15s, stroke 0.15s;
+  display: block;
+}
+.action-btn.liked .heart-icon { transform: scale(1.25); }
+.delete-post-btn { margin-left: auto; }
+.delete-post-btn:hover { background: #fff0f0; color: #e03e3e; }
+
+/* ── More menu ── */
+.more-btn { margin-left: auto; position: relative; }
+.more-menu {
+  display: none;
+  position: absolute;
+  right: 0; bottom: calc(100% + 4px);
+  background: #fff;
+  border: 1px solid #e5e5e5;
+  border-radius: 10px;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.12);
+  min-width: 140px;
+  z-index: 80;
+  overflow: hidden;
+}
+.more-menu.open { display: block; }
+.more-menu-item {
+  display: flex; align-items: center; gap: 8px;
+  width: 100%; padding: 10px 14px;
+  background: none; border: none;
+  font-size: 13px; font-family: inherit;
+  color: #333; cursor: pointer; text-align: left;
+}
+.more-menu-item:hover { background: #f5f5f5; }
+.more-menu-item.danger { color: #e03e3e; }
+.more-menu-item.danger:hover { background: #fff0f0; }
+
+/* ── Report modal ── */
+.report-modal-title { font-size: 15px; font-weight: 700; color: #111; margin-bottom: 6px; }
+.report-modal-sub   { font-size: 13px; color: #666; margin-bottom: 0; line-height: 1.5; }
+
+/* ── Comments ── */
+.comments-section { margin-top: 14px; display: none; flex-direction: column; }
+.comments-section.open { display: flex; }
+.comment-list { display: flex; flex-direction: column; gap: 10px; margin-bottom: 12px; }
+.comment-item { display: flex; gap: 9px; align-items: flex-start; }
+.comment-bubble { background: #f7f7f7; border-radius: 10px; padding: 8px 11px; flex: 1; }
+.comment-author { font-size: 12px; font-weight: 600; color: #111; margin-bottom: 2px; }
+.comment-body { font-size: 13px; color: #444; line-height: 1.45; word-break: break-word; }
+.comment-time { font-size: 11px; color: #bbb; margin-top: 3px; }
+.comment-delete-btn {
+  background: none; border: none;
+  padding: 4px; border-radius: 6px;
+  cursor: pointer; color: #ddd;
+  flex-shrink: 0; align-self: flex-start; margin-top: 6px;
+}
+.comment-delete-btn:hover { color: #e03e3e; background: #fff0f0; }
+.comment-compose { display: flex; gap: 8px; align-items: flex-end; }
+.comment-input {
+  flex: 1; border: 1px solid #e5e5e5;
+  border-radius: 10px; padding: 8px 12px;
+  font-size: 13px; font-family: inherit;
+  color: #222; outline: none; resize: none;
+  min-height: 38px; max-height: 120px; line-height: 1.4;
+}
+.comment-input:focus { border-color: #bbb; }
+.comment-input::placeholder { color: #bbb; }
+
+/* ── States ── */
+.state-msg { text-align: center; padding: 48px 0; color: #bbb; font-size: 14px; line-height: 1.6; }
+.state-msg .icon { font-size: 28px; margin-bottom: 8px; }
+
+/* ── Skeleton ── */
+.skeleton { animation: pulse 1.4s ease-in-out infinite; }
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+.skel-card { background: #f5f5f5; border-radius: 14px; height: 110px; margin-bottom: 16px; }
+
+/* ── Confirm modal ── */
+.modal-backdrop {
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,0.18);
+  z-index: 200;
+  display: flex; align-items: center; justify-content: center;
+  padding: 24px;
+}
+.modal-box {
+  background: #fff; border-radius: 14px;
+  padding: 24px 20px 18px;
+  max-width: 320px; width: 100%;
+  box-shadow: 0 8px 40px rgba(0,0,0,0.14);
+}
+.modal-box p { font-size: 14px; color: #333; line-height: 1.5; margin-bottom: 18px; }
+.modal-actions { display: flex; gap: 8px; justify-content: flex-end; }
+.btn-cancel {
+  background: #f3f3f3; border: none; border-radius: var(--radius);
+  padding: 8px 16px; font-size: 13px; font-weight: 500;
+  color: #555; cursor: pointer; font-family: inherit;
+}
+.btn-cancel:hover { background: #e8e8e8; }
+.btn-danger {
+  background: #e03e3e; border: none; border-radius: var(--radius);
+  padding: 8px 16px; font-size: 13px; font-weight: 600;
+  color: #fff; cursor: pointer; font-family: inherit;
+}
+.btn-danger:hover { background: #c53030; }
+
+/* ── Toast ── */
+.toast {
+  position: fixed; bottom: 110px; left: 50%; transform: translateX(-50%);
+  background: #333; color: #fff; font-size: 13px;
+  padding: 9px 18px; border-radius: 20px;
+  z-index: 300; opacity: 0; transition: opacity 0.2s;
+  white-space: nowrap; pointer-events: none;
+}
+.toast.show { opacity: 1; }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="topbar-inner">
+    <button class="back-btn" id="backBtn" title="Back">
+      <svg width="16" height="16" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 2L4 7l5 5"/></svg>
+    </button>
+    <span class="topbar-title" id="pageTitle">Forum</span>
+    <button class="back-btn" id="refreshBtn" style="margin-left:auto" title="Refresh">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+    </button>
+  </div>
+</div>
+
+<!-- Compose sheet (hidden by default, slides up) -->
+<div id="composeSheet" style="display:none; position:fixed; bottom:100px; left:0; right:0; z-index:60; padding:0 20px 12px;">
+  <div style="max-width:640px; margin:0 auto; background:#fff; border:1px solid #e0e0e0; border-radius:14px; padding:16px; box-shadow:0 -4px 24px rgba(0,0,0,0.10);">
+    <div class="compose-header">
+      <div class="avatar" id="composeAvatar">?</div>
+      <span class="compose-name" id="composeName">Loading…</span>
+      <button id="closeCompose" style="margin-left:auto; background:none; border:none; font-size:20px; color:#aaa; cursor:pointer; line-height:1; padding:0 4px;">&times;</button>
+    </div>
+    <textarea id="postInput" placeholder="Share something…" rows="3" style="width:100%; border:none; background:transparent; resize:none; font-size:14px; line-height:1.5; color:#222; outline:none; min-height:64px; font-family:inherit;"></textarea>
+    <div class="compose-footer">
+      <span class="error-msg" id="postError" style="display:none"></span>
+      <button class="btn-post" id="submitPost" disabled>Post</button>
+    </div>
+  </div>
+</div>
+
+<div class="bottombar">
+  <div class="bottombar-inner">
+    <button class="btn-new-post" id="newPostBtn">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+      Create a new post
+    </button>
+  </div>
+</div>
+
+<div class="shell">
+  <div id="feed" class="feed">
+    <div class="skel-card skeleton"></div>
+    <div class="skel-card skeleton"></div>
+    <div class="skel-card skeleton"></div>
+  </div>
+
+  <div id="emptyState" class="state-msg" style="display:none">
+    <div class="icon">💬</div>
+    Be the first to post something.
+  </div>
+
+  <div id="loadError" class="state-msg" style="display:none">
+    <div class="icon">⚠️</div>
+    <span id="loadErrorMsg">Couldn't load posts.</span>
+  </div>
+</div>
+
+<!-- Confirm modal -->
+<div class="modal-backdrop" id="modalBackdrop" style="display:none">
+  <div class="modal-box">
+    <p id="modalMsg">Are you sure?</p>
+    <div class="modal-actions">
+      <button class="btn-cancel" id="modalCancel">Cancel</button>
+      <button class="btn-danger" id="modalOk">Delete</button>
+    </div>
+  </div>
+</div>
+
+<!-- Report modal -->
+<div class="modal-backdrop" id="reportBackdrop" style="display:none">
+  <div class="modal-box" style="max-width:320px">
+    <p class="report-modal-title">Report post</p>
+    <p class="report-modal-sub" id="reportSubtitle"></p>
+    <div class="modal-actions" style="margin-top:18px">
+      <button class="btn-cancel" id="reportCancel">Cancel</button>
+      <button class="btn-danger" id="reportSubmit">Report</button>
+    </div>
+    <div style="font-size:11px;color:#bbb;margin-top:10px;text-align:center" id="reportStatus"></div>
+  </div>
+</div>
+
+<!-- Toast -->
+<div class="toast" id="toast"></div>
+
+<script>
+// =============================================================
+// Cogniss External Template — Community Forum
+// =============================================================
+
+// ── Bridge ────────────────────────────────────────────────────
+var isNative = (typeof window.ReactNativeWebView !== 'undefined');
+
+function postToApp(key, data) {
+  var msg = JSON.stringify({ key: key, data: data || null });
+  if (isNative) window.ReactNativeWebView.postMessage(msg);
+  else window.parent.postMessage(msg, '*');
+}
+
+// ── State ─────────────────────────────────────────────────────
+var appState   = {};
+var REQUIRED   = ['API', 'USER', 'AUTH', 'ACTIVITY', 'ACTIVITY_RESPONSE', 'CONFIG', 'QUESTIONS'];
+var started    = false;
+var posts      = [];
+var apiUrl     = '';
+var userId     = '';
+var userName   = '';
+var userInits  = '';
+var userAvatar = ''; // resolved avatar URL for current user
+var reportMCQuestion  = null; // MULTICHOICE question object from QUESTIONS
+var reportTxtQuestion = null; // TEXT_RESPONSE question object from QUESTIONS
+
+// ── REST_REQUEST helper (for theme) ───────────────────────────
+var _reqCounter = 0;
+var _reqMap = {};
+
+function restRequest(method, model, data) {
+  return new Promise(function(resolve, reject) {
+    var id = 'rr' + (++_reqCounter);
+    _reqMap[id] = { resolve: resolve, reject: reject };
+    var msg = JSON.stringify({ key: 'REST_REQUEST', method: method, model: model, data: data || {}, id: id, specialParams: null });
+    if (isNative) window.ReactNativeWebView.postMessage(msg);
+    else window.parent.postMessage(msg, '*');
+  });
+}
+
+// ── Message handler ───────────────────────────────────────────
+function onMessage(evt) {
+  try {
+    var msg = JSON.parse(evt.data);
+    if (!msg || !msg.key) return;
+
+    // REST_REQUEST responses
+    if (msg.key === 'REQUEST_RESPONSE') {
+      var p = _reqMap[msg.id];
+      if (p) {
+        delete _reqMap[msg.id];
+        if (msg.error) p.reject(new Error(msg.error));
+        else p.resolve(msg.data);
+      }
+      return;
+    }
+
+    // Init messages
+    appState[msg.key] = msg.data;
+    if (!started && REQUIRED.every(function(k) { return appState[k] !== undefined; })) {
+      started = true;
+      startTemplate();
+    }
+  } catch(e) {}
+}
+
+document.addEventListener('message', onMessage);
+window.addEventListener('message', onMessage);
+window.addEventListener('load', function() { postToApp('READY_DYNAMIC_MEDIA'); });
+
+// ── Start ─────────────────────────────────────────────────────
+function startTemplate() {
+  var cfg = appState.CONFIG || {};
+  var u   = appState.USER   || {};
+  var act = appState.ACTIVITY || {};
+
+  apiUrl   = cfg.appsScriptUrl || '';
+  userId   = u.id || u._id || ('anon-' + Math.random().toString(36).slice(2, 8));
+  userName = u.displayName || u.display_name || u.name || u.fullName
+    || ([u.firstName, u.lastName].filter(Boolean).join(' '))
+    || ([u.first_name, u.last_name].filter(Boolean).join(' '))
+    || u.username || u.email || 'Anonymous';
+
+  console.log('[Forum] USER fields:', JSON.stringify(u));
+
+  userInits = userName.trim().split(/\s+/).map(function(w) { return w[0]; }).join('').slice(0, 2).toUpperCase();
+
+  // Set title from activity name
+  var actName = act.name || 'Forum';
+  document.getElementById('pageTitle').textContent = actName;
+  document.title = actName;
+
+  // Set compose header
+  var avEl = document.getElementById('composeAvatar');
+  setAvatarEl(avEl, userAvatar, userInits, avatarColor(userId));
+  document.getElementById('composeName').textContent = userName;
+  document.getElementById('submitPost').disabled = false;
+
+  // Resolve report questions from the activity's question set
+  var qs = appState.QUESTIONS || [];
+  qs.forEach(function(q) {
+    if (q.type === 'MULTICHOICE' && !reportMCQuestion)  reportMCQuestion  = q;
+    if (q.type === 'TEXT_RESPONSE' && !reportTxtQuestion) reportTxtQuestion = q;
+  });
+  console.log('[Forum] Report MC question:', reportMCQuestion ? reportMCQuestion._id : 'not found');
+  console.log('[Forum] Report text question:', reportTxtQuestion ? reportTxtQuestion._id : 'not found');
+
+  // Apply app theme (non-blocking)
+  applyTheme();
+
+  if (!apiUrl) {
+    showLoadError('appsScriptUrl is missing from CONFIG.');
+    return;
+  }
+
+  // Resolve avatar then sync profile to sheet and load posts
+  resolveMyAvatar().then(function() {
+    callApi({
+      action:      'updateUserProfile',
+      userId:      userId,
+      avatarUrl:   userAvatar,
+      displayName: userName
+    }).catch(function() {});
+    loadPosts();
+  });
+}
+
+// ── Resolve current user's avatar via REST_REQUEST ────────────
+function resolveMyAvatar() {
+  return new Promise(function(resolve) {
+    var u = appState.USER || {};
+
+    // Log full USER object so we can see exactly what Cogniss provides
+    console.log('[Forum] Full USER object:', JSON.stringify(u));
+
+    // Deep-search all string values in an object for something that looks
+    // like a Cogniss File ID (24-char hex) or a direct image URL
+    function findInObj(obj, depth) {
+      if (!obj || depth > 4) return '';
+      if (typeof obj === 'string') {
+        if (obj.match(/^https?:\/\/.+\.(jpg|jpeg|png|gif|webp)/i)) return obj; // direct URL
+        if (obj.match(/^[a-f0-9]{24}$/i)) return obj; // Cogniss ObjectId
+      }
+      if (typeof obj === 'object') {
+        // Prioritise likely field names first
+        var priority = ['picture','avatar','image','photo','avatarUrl','profilePicture',
+                        'avatarFileId','profileImage','thumbnail','icon','file'];
+        for (var pi = 0; pi < priority.length; pi++) {
+          var val = findInObj(obj[priority[pi]], depth + 1);
+          if (val) return val;
+        }
+        // Then scan all other keys
+        var keys = Object.keys(obj);
+        for (var ki = 0; ki < keys.length; ki++) {
+          if (priority.indexOf(keys[ki]) === -1) {
+            var val = findInObj(obj[keys[ki]], depth + 1);
+            if (val) return val;
+          }
+        }
+      }
+      return '';
+    }
+
+    var found = findInObj(u, 0);
+    console.log('[Forum] Avatar candidate found in USER:', found || 'none');
+
+    function applyUrl(url) {
+      userAvatar = url;
+      setAvatarEl(document.getElementById('composeAvatar'), url, userInits, avatarColor(userId));
+    }
+
+    function tryFileId(fileId) {
+      return restRequest('get', 'File', fileId)
+        .then(function(file) {
+          console.log('[Forum] File record:', JSON.stringify(file));
+          var url = (file && (file.url || file.uri || file.downloadUrl || file.src)) || '';
+          if (url) applyUrl(url);
+          return url;
+        });
+    }
+
+    // Strategy 1: direct URL found in USER object
+    if (found && found.match(/^https?:\/\//)) {
+      applyUrl(found);
+      resolve();
+      return;
+    }
+
+    // Strategy 2: File ID found in USER object — fetch File record
+    if (found && found.match(/^[a-f0-9]{24}$/i)) {
+      tryFileId(found)
+        .then(function() { resolve(); })
+        .catch(function() {
+          // Strategy 3: try fetching AppUser which may have avatar
+          tryAppUser().then(resolve).catch(resolve);
+        });
+      return;
+    }
+
+    // Strategy 3: nothing in USER — try fetching AppUser record
+    tryAppUser().then(resolve).catch(resolve);
+  });
+}
+
+function tryAppUser() {
+  // AppUser may carry avatar/picture fields not in the USER init message
+  var appId = appState.ACTIVITY_RESPONSE && appState.ACTIVITY_RESPONSE.app;
+  if (!appId || !userId) return Promise.resolve();
+
+  return restRequest('list', 'AppUser', { user: userId, app: appId })
+    .then(function(res) {
+      console.log('[Forum] AppUser result:', JSON.stringify(res));
+      var au = res && res.items && res.items[0];
+      if (!au) return;
+
+      // Deep-search AppUser for avatar
+      function findUrl(obj, depth) {
+        if (!obj || depth > 3) return '';
+        if (typeof obj === 'string') {
+          if (obj.match(/^https?:\/\/.+\.(jpg|jpeg|png|gif|webp)/i)) return obj;
+          if (obj.match(/^[a-f0-9]{24}$/i)) return obj;
+        }
+        if (typeof obj === 'object') {
+          var keys = Object.keys(obj);
+          for (var i = 0; i < keys.length; i++) {
+            var v = findUrl(obj[keys[i]], depth + 1);
+            if (v) return v;
+          }
+        }
+        return '';
+      }
+
+      var candidate = findUrl(au, 0);
+      console.log('[Forum] Avatar candidate in AppUser:', candidate || 'none');
+      if (!candidate) return;
+
+      if (candidate.match(/^https?:\/\//)) {
+        userAvatar = candidate;
+        setAvatarEl(document.getElementById('composeAvatar'), candidate, userInits, avatarColor(userId));
+      } else if (candidate.match(/^[a-f0-9]{24}$/i)) {
+        return restRequest('get', 'File', candidate).then(function(file) {
+          console.log('[Forum] AppUser File record:', JSON.stringify(file));
+          var url = file && (file.url || file.uri || file.downloadUrl || file.src);
+          if (url) {
+            userAvatar = url;
+            setAvatarEl(document.getElementById('composeAvatar'), url, userInits, avatarColor(userId));
+          }
+        });
+      }
+    })
+    .catch(function(e) {
+      console.log('[Forum] AppUser fetch failed:', e.message);
+    });
+}
+
+// ── JSONP API ─────────────────────────────────────────────────
+var _cbCounter = 0;
+
+function callApi(params) {
+  return new Promise(function(resolve, reject) {
+    var cbName = '_fc' + (++_cbCounter);
+    var timer = setTimeout(function() {
+      delete window[cbName];
+      reject(new Error('Timed out'));
+    }, 15000);
+
+    window[cbName] = function(data) {
+      clearTimeout(timer);
+      delete window[cbName];
+      if (tag && tag.parentNode) tag.parentNode.removeChild(tag);
+      resolve(data);
+    };
+
+    var qs = Object.keys(params).map(function(k) {
+      return encodeURIComponent(k) + '=' + encodeURIComponent(params[k]);
+    }).join('&');
+
+    var tag = document.createElement('script');
+    tag.src = apiUrl + '?' + qs + '&callback=' + cbName;
+    tag.onerror = function() {
+      clearTimeout(timer);
+      delete window[cbName];
+      reject(new Error('Network error'));
+    };
+    document.head.appendChild(tag);
+  });
+}
+
+// ── Load posts ────────────────────────────────────────────────
+function loadPosts() {
+  callApi({ action: 'getPosts', userId: userId })
+    .then(function(res) {
+      if (!res.ok) throw new Error(res.error);
+      posts = res.data || [];
+      renderFeed();
+    })
+    .catch(function(e) {
+      showLoadError('Could not load posts. Check appsScriptUrl in CONFIG.');
+    });
+}
+
+// ── Render feed ───────────────────────────────────────────────
+function renderFeed() {
+  var feed = document.getElementById('feed');
+  feed.innerHTML = '';
+  document.getElementById('emptyState').style.display = posts.length ? 'none' : 'block';
+  document.getElementById('loadError').style.display  = 'none';
+  posts.forEach(function(post) {
+    // Cache colors from server so avatarColor() stays consistent
+    cacheColor(post.authorId, post.authorColor);
+    cacheAvatar(post.authorId, post.authorAvatar);
+    (post.comments || []).forEach(function(c) {
+      cacheColor(c.authorId, c.authorColor);
+      cacheAvatar(c.authorId, c.authorAvatar);
+    });
+    feed.appendChild(makeCard(post));
+  });
+}
+
+function makeCard(post) {
+  var card = document.createElement('div');
+  card.className = 'post-card';
+  card.setAttribute('data-id', post.id);
+
+  // Meta
+  var meta = document.createElement('div');
+  meta.className = 'post-meta';
+
+  var av = document.createElement('div');
+  av.className = 'avatar';
+  setAvatarEl(av, post.authorAvatar || _avatarCache[post.authorId] || '', initials(post.authorName), post.authorColor || avatarColor(post.authorId));
+
+  var authorEl = document.createElement('span');
+  authorEl.className = 'post-author';
+  authorEl.textContent = post.authorName || 'Unknown';
+
+  var timeEl = document.createElement('span');
+  timeEl.className = 'post-time';
+  timeEl.textContent = relTime(post.timestamp);
+
+  meta.appendChild(av);
+  meta.appendChild(authorEl);
+  meta.appendChild(timeEl);
+
+  // Body
+  var bodyEl = document.createElement('div');
+  bodyEl.className = 'post-body';
+  bodyEl.innerHTML = linkify(post.body);
+
+  // Actions
+  var actions = document.createElement('div');
+  actions.className = 'post-actions';
+
+  var likeBtn = document.createElement('button');
+  likeBtn.className = 'action-btn like-btn' + (post.likedByMe ? ' liked' : '');
+  likeBtn.innerHTML = heartSVG(post.likedByMe) + '<span class="like-count">' + post.likeCount + '</span>';
+  likeBtn.addEventListener('click', function() { doLike(post, card); });
+
+  var commentBtn = document.createElement('button');
+  commentBtn.className = 'action-btn';
+  commentBtn.innerHTML = chatSVG() + '<span class="ccount">' + post.commentCount + '</span>';
+  commentBtn.addEventListener('click', function() {
+    card.querySelector('.comments-section').classList.toggle('open');
+  });
+
+  actions.appendChild(likeBtn);
+  actions.appendChild(commentBtn);
+
+  // More button (⋯) — contains Delete (own posts) and Report (others' posts)
+  var moreBtn = document.createElement('button');
+  moreBtn.className = 'action-btn more-btn';
+  moreBtn.innerHTML = moreSVG();
+  moreBtn.setAttribute('title', 'More');
+
+  var moreMenu = document.createElement('div');
+  moreMenu.className = 'more-menu';
+
+  if (post.authorId === userId) {
+    // Own post — show Delete
+    var delItem = document.createElement('button');
+    delItem.className = 'more-menu-item danger';
+    delItem.innerHTML = trashSVG() + ' Delete post';
+    delItem.addEventListener('click', function() {
+      moreMenu.classList.remove('open');
+      doDeletePost(post, card);
+    });
+    moreMenu.appendChild(delItem);
+  } else {
+    // Others' post — show Report
+    var repItem = document.createElement('button');
+    repItem.className = 'more-menu-item';
+    repItem.innerHTML = flagSVG() + ' Report post';
+    repItem.addEventListener('click', function() {
+      moreMenu.classList.remove('open');
+      doReportPost(post);
+    });
+    moreMenu.appendChild(repItem);
+  }
+
+  moreBtn.appendChild(moreMenu);
+  moreBtn.addEventListener('click', function(e) {
+    e.stopPropagation();
+    moreMenu.classList.toggle('open');
+  });
+
+  actions.appendChild(moreBtn);
+
+  // Close menu when clicking outside
+  document.addEventListener('click', function() { moreMenu.classList.remove('open'); });
+
+  // Comments section
+  var commSec = document.createElement('div');
+  commSec.className = 'comments-section';
+
+  var commList = document.createElement('div');
+  commList.className = 'comment-list';
+  commList.id = 'clist-' + post.id;
+  renderComments(commList, post.comments || [], post.id);
+
+  // Comment compose
+  var compose = document.createElement('div');
+  compose.className = 'comment-compose';
+
+  var myAv = document.createElement('div');
+  myAv.className = 'avatar sm';
+  setAvatarEl(myAv, userAvatar, userInits, avatarColor(userId));
+
+  var cinput = document.createElement('textarea');
+  cinput.className = 'comment-input';
+  cinput.placeholder = 'Write a comment…';
+  cinput.rows = 1;
+  cinput.addEventListener('input', function() {
+    this.style.height = 'auto';
+    this.style.height = Math.min(this.scrollHeight, 120) + 'px';
+  });
+
+  var csubmit = document.createElement('button');
+  csubmit.className = 'btn-comment';
+  csubmit.textContent = 'Reply';
+  csubmit.addEventListener('click', function() { doComment(post, card, cinput, csubmit); });
+
+  compose.appendChild(myAv);
+  compose.appendChild(cinput);
+  compose.appendChild(csubmit);
+
+  commSec.appendChild(commList);
+  commSec.appendChild(compose);
+
+  card.appendChild(meta);
+  card.appendChild(bodyEl);
+  card.appendChild(actions);
+  card.appendChild(commSec);
+
+  return card;
+}
+
+function renderComments(listEl, comments, postId) {
+  listEl.innerHTML = '';
+  (comments || []).sort(function(a, b) { return new Date(a.timestamp) - new Date(b.timestamp); });
+  comments.forEach(function(c) {
+    var item = document.createElement('div');
+    item.className = 'comment-item';
+    item.setAttribute('data-cid', c.id);
+
+    var av = document.createElement('div');
+    av.className = 'avatar sm';
+    setAvatarEl(av, c.authorAvatar || '', initials(c.authorName), c.authorColor || avatarColor(c.authorId));
+
+    var bubble = document.createElement('div');
+    bubble.className = 'comment-bubble';
+
+    var cauth = document.createElement('div');
+    cauth.className = 'comment-author';
+    cauth.textContent = c.authorName || 'Unknown';
+
+    var cbody = document.createElement('div');
+    cbody.className = 'comment-body';
+    cbody.innerHTML = linkify(c.body);
+
+    var ctime = document.createElement('div');
+    ctime.className = 'comment-time';
+    ctime.textContent = relTime(c.timestamp);
+
+    bubble.appendChild(cauth);
+    bubble.appendChild(cbody);
+    bubble.appendChild(ctime);
+    item.appendChild(av);
+    item.appendChild(bubble);
+
+    // Delete if: own comment OR you own the post
+    var post_obj = posts.find(function(p) { return p.id === postId; });
+    var canDelete = (c.authorId === userId) || (post_obj && post_obj.authorId === userId);
+    if (canDelete) {
+      var delbtn = document.createElement('button');
+      delbtn.className = 'comment-delete-btn';
+      delbtn.innerHTML = trashSVG();
+      delbtn.addEventListener('click', function() { doDeleteComment(c.id, postId, item, card_ref); });
+      item.appendChild(delbtn);
+    }
+
+    listEl.appendChild(item);
+  });
+
+  // card_ref is set when called from makeCard context — patch it in below
+  function card_ref() { return document.querySelector('[data-id="' + postId + '"]'); }
+}
+
+// ── Like ──────────────────────────────────────────────────────
+function doLike(post, card) {
+  var likeBtn = card.querySelector('.like-btn');
+  if (!likeBtn || likeBtn.dataset.pending === '1') return; // debounce
+
+  var wasLiked = post.likedByMe;
+  post.likedByMe  = !wasLiked;
+  post.likeCount += wasLiked ? -1 : 1;
+
+  updateLikeBtn(likeBtn, post.likedByMe, post.likeCount);
+
+  likeBtn.dataset.pending = '1';
+  callApi({ action: 'toggleLike', postId: post.id, userId: userId })
+    .catch(function() {
+      // revert on failure
+      post.likedByMe  = wasLiked;
+      post.likeCount += wasLiked ? 1 : -1;
+      updateLikeBtn(likeBtn, post.likedByMe, post.likeCount);
+    })
+    .finally(function() {
+      delete likeBtn.dataset.pending;
+    });
+}
+
+function updateLikeBtn(btn, liked, count) {
+  // Toggle class
+  if (liked) btn.classList.add('liked');
+  else btn.classList.remove('liked');
+
+  // Update count text
+  var countEl = btn.querySelector('.like-count');
+  if (countEl) countEl.textContent = count;
+
+  // Mutate SVG fill/stroke directly — no re-render, smooth transition
+  var svg  = btn.querySelector('svg');
+  var path = btn.querySelector('path');
+  if (svg && path) {
+    var fill   = liked ? '#e03e3e' : 'none';
+    var stroke = liked ? '#e03e3e' : 'currentColor';
+    svg.setAttribute('fill',   fill);
+    svg.setAttribute('stroke', stroke);
+    path.setAttribute('fill',   fill);
+    path.setAttribute('stroke', stroke);
+  }
+}
+
+// ── New post ──────────────────────────────────────────────────
+document.getElementById('postInput').addEventListener('input', function() {
+  document.getElementById('submitPost').disabled = !this.value.trim();
+  this.style.height = 'auto';
+  this.style.height = this.scrollHeight + 'px';
+});
+
+document.getElementById('submitPost').addEventListener('click', function() {
+  var input = document.getElementById('postInput');
+  var text  = input.value.trim();
+  if (!text) return;
+  var btn = document.getElementById('submitPost');
+  btn.disabled = true;
+  btn.textContent = 'Posting…';
+
+  callApi({ action: 'createPost', authorId: userId, authorName: userName, text: text })
+    .then(function(res) {
+      if (!res.ok) throw new Error(res.error);
+      cacheColor(res.data.authorId, res.data.authorColor);
+      cacheAvatar(res.data.authorId, res.data.authorAvatar);
+      posts.unshift(res.data);
+      input.value = '';
+      input.style.height = '';
+      closeCompose();
+      renderFeed();
+    })
+    .catch(function() {
+      var e = document.getElementById('postError');
+      e.textContent = 'Failed to post. Try again.';
+      e.style.display = 'inline';
+      setTimeout(function() { e.style.display = 'none'; }, 3000);
+    })
+    .finally(function() {
+      btn.disabled = false;
+      btn.textContent = 'Create a new post';
+    });
+});
+
+// ── New comment ───────────────────────────────────────────────
+function doComment(post, card, input, btn) {
+  var text = input.value.trim();
+  if (!text) return;
+  btn.disabled = true;
+  btn.textContent = '…';
+
+  callApi({ action: 'addComment', postId: post.id, authorId: userId, authorName: userName, text: text })
+    .then(function(res) {
+      if (!res.ok) throw new Error(res.error);
+      if (!post.comments) post.comments = [];
+      cacheColor(res.data.authorId, res.data.authorColor);
+      cacheAvatar(res.data.authorId, res.data.authorAvatar);
+      post.comments.push(res.data);
+      post.commentCount++;
+      var listEl = document.getElementById('clist-' + post.id);
+      renderComments(listEl, post.comments, post.id);
+      card.querySelector('.ccount').textContent = post.commentCount;
+      input.value = '';
+      input.style.height = '';
+    })
+    .catch(function() {})
+    .finally(function() {
+      btn.disabled = false;
+      btn.textContent = 'Reply';
+    });
+}
+
+// ── Delete post ───────────────────────────────────────────────
+function doDeletePost(post, card) {
+  showConfirm('Delete this post? This cannot be undone.', function() {
+    card.style.opacity = '0.4';
+    card.style.pointerEvents = 'none';
+    callApi({ action: 'deletePost', postId: post.id, userId: userId })
+      .then(function(res) {
+        if (!res.ok) throw new Error(res.error);
+        posts = posts.filter(function(p) { return p.id !== post.id; });
+        card.remove();
+        showToast('Post deleted');
+        if (!posts.length) document.getElementById('emptyState').style.display = 'block';
+      })
+      .catch(function() {
+        card.style.opacity = '';
+        card.style.pointerEvents = '';
+        showToast('Could not delete. Try again.');
+      });
+  });
+}
+
+// ── Delete comment ────────────────────────────────────────────
+function doDeleteComment(commentId, postId, item, getCard) {
+  showConfirm('Delete this comment?', function() {
+    item.style.opacity = '0.4';
+    item.style.pointerEvents = 'none';
+    callApi({ action: 'deleteComment', commentId: commentId, userId: userId })
+      .then(function(res) {
+        if (!res.ok) throw new Error(res.error);
+        var post = posts.find(function(p) { return p.id === postId; });
+        if (post) {
+          post.comments = (post.comments || []).filter(function(c) { return c.id !== commentId; });
+          post.commentCount = Math.max(0, post.commentCount - 1);
+          var card = getCard();
+          if (card) card.querySelector('.ccount').textContent = post.commentCount;
+        }
+        item.remove();
+        showToast('Comment deleted');
+      })
+      .catch(function() {
+        item.style.opacity = '';
+        item.style.pointerEvents = '';
+        showToast('Could not delete. Try again.');
+      });
+  });
+}
+
+// ── Report post ───────────────────────────────────────────────
+var _reportingPost = null;
+
+function doReportPost(post) {
+  _reportingPost = post;
+  document.getElementById('reportSubtitle').textContent =
+    'Report post by ' + post.authorName + '?';
+  document.getElementById('reportStatus').textContent = '';
+  document.getElementById('reportSubmit').disabled = false;
+  document.getElementById('reportSubmit').textContent = 'Report';
+  document.getElementById('reportBackdrop').style.display = 'flex';
+}
+
+document.getElementById('reportCancel').addEventListener('click', function() {
+  document.getElementById('reportBackdrop').style.display = 'none';
+  _reportingPost = null;
+});
+
+document.getElementById('reportSubmit').addEventListener('click', function() {
+  if (!_reportingPost) return;
+
+  var post      = _reportingPost;
+  var submitBtn = document.getElementById('reportSubmit');
+  var statusEl  = document.getElementById('reportStatus');
+
+  submitBtn.disabled    = true;
+  submitBtn.textContent = 'Reporting…';
+
+  // Report text — auto-filled, no user input needed
+  var reportedAt = new Date().toLocaleString();
+  var reportText =
+    'Reported by: '    + userName                + '\n' +
+    'Reported at: '    + reportedAt              + '\n\n' +
+    'Post author: '    + post.authorName         + '\n' +
+    'Posted: '         + relTime(post.timestamp) + '\n\n' +
+    'Post content:\n' + post.body;
+
+  var activityId = appState.ACTIVITY && (appState.ACTIVITY.id || appState.ACTIVITY._id);
+
+  restRequest('post', 'ActivityResponse', { activity: activityId, user: userId })
+  .then(function(ar) {
+    var arId = ar.id || ar._id;
+    if (!arId) throw new Error('No ActivityResponse ID');
+
+    // Submit MULTICHOICE (first option = "Report" — just needs any option to trigger behaviour)
+    var mcPromise = reportMCQuestion
+      ? restRequest('post', 'QuestionResponse', {
+          question:               reportMCQuestion._id || reportMCQuestion.id,
+          option:                 (reportMCQuestion.options || [])[0] || { _id: 'report' },
+          parentActivityResponse: arId,
+          duration:               1
+        })
+      : Promise.resolve();
+
+    return mcPromise.then(function() {
+      // Submit TEXT_RESPONSE with the pre-filled report detail
+      if (!reportTxtQuestion) return;
+      return restRequest('post', 'QuestionResponse', {
+        question:               reportTxtQuestion._id || reportTxtQuestion.id,
+        text:                   reportText,
+        parentActivityResponse: arId,
+        duration:               1
+      });
+    })
+    .then(function() {
+      // Mark complete to fire behaviours
+      return restRequest('put', 'ActivityResponse', {
+        id:            arId,
+        complete:      true,
+        completeState: 'COMPLETE'
+      });
+    });
+  })
+  .then(function() {
+    document.getElementById('reportBackdrop').style.display = 'none';
+    _reportingPost = null;
+    showToast('Post reported');
+  })
+  .catch(function(e) {
+    statusEl.textContent  = 'Something went wrong. Try again.';
+    submitBtn.disabled    = false;
+    submitBtn.textContent = 'Report';
+    console.log('[Forum] Report error:', e.message);
+  });
+});
+
+// ── Back button ───────────────────────────────────────────────
+document.getElementById('backBtn').addEventListener('click', function() {
+  postToApp('QUIT', { completeState: 'COMPLETE' });
+});
+
+// New post button — toggle compose sheet
+function openCompose() {
+  document.getElementById('composeSheet').style.display = 'block';
+  document.getElementById('newPostBtn').style.display = 'none';
+  setTimeout(function() { document.getElementById('postInput').focus(); }, 50);
+}
+
+function closeCompose() {
+  document.getElementById('composeSheet').style.display = 'none';
+  document.getElementById('newPostBtn').style.display = '';
+}
+
+document.getElementById('newPostBtn').addEventListener('click', openCompose);
+document.getElementById('closeCompose').addEventListener('click', closeCompose);
+
+document.getElementById('refreshBtn').addEventListener('click', function() {
+  var btn = document.getElementById('refreshBtn');
+  btn.disabled = true;
+  btn.style.opacity = '0.5';
+  document.getElementById('feed').innerHTML = '<div class="skel-card skeleton"></div><div class="skel-card skeleton"></div><div class="skel-card skeleton"></div>';
+  document.getElementById('emptyState').style.display = 'none';
+  document.getElementById('loadError').style.display  = 'none';
+  loadPosts();
+  setTimeout(function() {
+    btn.disabled = false;
+    btn.style.opacity = '';
+  }, 1000);
+});
+
+// ── Confirm modal ─────────────────────────────────────────────
+function showConfirm(msg, onOk) {
+  document.getElementById('modalMsg').textContent = msg;
+  document.getElementById('modalBackdrop').style.display = 'flex';
+
+  function close() {
+    document.getElementById('modalBackdrop').style.display = 'none';
+    var ok = document.getElementById('modalOk');
+    var cancel = document.getElementById('modalCancel');
+    ok.replaceWith(ok.cloneNode(true));
+    cancel.replaceWith(cancel.cloneNode(true));
+  }
+
+  document.getElementById('modalOk').addEventListener('click', function() { close(); onOk(); });
+  document.getElementById('modalCancel').addEventListener('click', close);
+  document.getElementById('modalBackdrop').addEventListener('click', function(e) {
+    if (e.target === this) close();
+  });
+}
+
+// ── Toast ─────────────────────────────────────────────────────
+function showToast(msg) {
+  var t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(function() { t.classList.remove('show'); }, 2800);
+}
+
+// ── Error state ───────────────────────────────────────────────
+function showLoadError(msg) {
+  document.getElementById('feed').innerHTML = '';
+  document.getElementById('loadError').style.display = 'block';
+  document.getElementById('loadErrorMsg').textContent = msg;
+}
+
+// ── Theme (non-blocking) ──────────────────────────────────────
+function applyTheme() {
+  var appId = appState.ACTIVITY_RESPONSE && appState.ACTIVITY_RESPONSE.app;
+  if (!appId) return;
+
+  Promise.all([
+    restRequest('get',  'App',      appId),
+    restRequest('list', 'Settings', {})
+  ]).then(function(results) {
+    var appRec   = results[0] || {};
+    var settings = results[1] || {};
+    var appTheme = appRec.theme || {};
+    var platTheme = (settings.items && settings.items[0] && settings.items[0].theme) || {};
+    var colors = Object.assign({}, platTheme.colors || {}, appTheme.colors || {});
+
+    var root = document.documentElement;
+
+    if (colors.primary) {
+      root.style.setProperty('--primary', colors.primary);
+      root.style.setProperty('--primary-dark', darken(colors.primary, 30));
+      root.style.setProperty('--primary-text', lum(colors.primary) > 0.35 ? '#111' : '#fff');
+    }
+
+    var hdrColor = (appTheme.activityHeader && appTheme.activityHeader.color)
+      || (appTheme.appHeader && appTheme.appHeader.color)
+      || (platTheme.appHeader && platTheme.appHeader.color);
+    if (hdrColor) {
+      root.style.setProperty('--topbar-bg', hdrColor);
+      root.style.setProperty('--topbar-border', darken(hdrColor, 15));
+      var tc = lum(hdrColor) > 0.35 ? '#111' : '#fff';
+      document.getElementById('pageTitle').style.color = tc;
+      var bb = document.getElementById('backBtn');
+      bb.style.color = tc;
+      bb.style.borderColor = tc === '#fff' ? 'rgba(255,255,255,0.3)' : '#e5e5e5';
+    }
+
+    var radiusMap = { NONE:'0px', SMALL:'4px', MEDIUM:'8px', LARGE:'16px', FULL:'9999px' };
+    var rounded = appTheme.rounded || platTheme.rounded;
+    if (rounded && radiusMap[rounded]) {
+      root.style.setProperty('--radius', radiusMap[rounded]);
+    }
+  }).catch(function(e) {
+    console.log('[Forum] Theme load skipped:', e.message);
+  });
+}
+
+// ── Utilities ─────────────────────────────────────────────────
+function esc(s) {
+  return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+function linkify(s) {
+  var escaped = esc(s).replace(/\n/g, '<br>');
+
+  // 1. [label](url) markdown links — full https?:// URLs
+  escaped = escaped.replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g,
+    '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>');
+
+  // 2. [label](www. ...) markdown links — bare www, prepend https://
+  escaped = escaped.replace(/\[([^\]]+)\]\((www\.[^\s)]+)\)/g,
+    '<a href="https://$2" target="_blank" rel="noopener noreferrer">$1</a>');
+
+  // 3. Full https?:// bare URLs not already inside an <a>
+  escaped = escaped.replace(/(?<!href="|">)(https?:\/\/[^\s<>"]+)/g,
+    '<a href="$1" target="_blank" rel="noopener noreferrer">$1</a>');
+
+  // 4. Bare www. URLs (no protocol) not already linked
+  escaped = escaped.replace(/(?<!href="|"https?:\/\/|\w)(www\.[^\s<>"]+)/g,
+    '<a href="https://$1" target="_blank" rel="noopener noreferrer">$1</a>');
+
+  return escaped;
+}
+function initials(name) {
+  return String(name || '?').trim().split(/\s+/).map(function(w){ return w[0]; }).join('').slice(0,2).toUpperCase();
+}
+
+// Set an avatar element — show photo if available, else initials + color
+function setAvatarEl(el, avatarUrl, inits, color) {
+  if (!el) return;
+  // Remove any existing img
+  var existing = el.querySelector('img');
+  if (existing) existing.parentNode.removeChild(existing);
+
+  if (avatarUrl) {
+    var img = document.createElement('img');
+    img.src = avatarUrl;
+    img.alt = inits || '';
+    img.onerror = function() {
+      // Image failed — fall back to initials
+      if (img.parentNode) img.parentNode.removeChild(img);
+      el.textContent = inits || '?';
+      if (color) el.style.background = color;
+    };
+    el.textContent = '';
+    el.appendChild(img);
+  } else {
+    el.textContent = inits || '?';
+    if (color) el.style.background = color;
+  }
+}
+function relTime(ts) {
+  if (!ts) return '';
+  var d = (Date.now() - new Date(ts)) / 1000;
+  if (d < 60)    return 'just now';
+  if (d < 3600)  return Math.floor(d/60) + 'm ago';
+  if (d < 86400) return Math.floor(d/3600) + 'h ago';
+  return Math.floor(d/86400) + 'd ago';
+}
+// User colors come from the sheet (authorColor field).
+// avatarColor() is a local fallback used only for the current
+// user's own compose avatar before the first API response.
+var _userColorCache = {};
+function avatarColor(id) {
+  if (_userColorCache[id]) return _userColorCache[id];
+  // Deterministic fallback using golden-angle hue distribution
+  var n = 0, s = String(id || '');
+  for (var i = 0; i < s.length; i++) n += s.charCodeAt(i);
+  var hue = (n * 137.508) % 360; // golden angle — maximally spread
+  return 'hsl(' + Math.round(hue) + ', 65%, 45%)';
+}
+function cacheColor(id, color) {
+  if (id && color) _userColorCache[id] = color;
+}
+// Cache avatar URLs so renderComments can access them without a re-fetch
+var _avatarCache = {};
+function cacheAvatar(id, url) {
+  if (id && url) _avatarCache[id] = url;
+}
+function lum(hex) {
+  var h = hex.replace('#','');
+  if (h.length === 3) h = h[0]+h[0]+h[1]+h[1]+h[2]+h[2];
+  var r=parseInt(h.slice(0,2),16)/255, g=parseInt(h.slice(2,4),16)/255, b=parseInt(h.slice(4,6),16)/255;
+  var c = function(x){ return x<=0.03928?x/12.92:Math.pow((x+0.055)/1.055,2.4); };
+  return 0.2126*c(r)+0.7152*c(g)+0.0722*c(b);
+}
+function darken(hex, amt) {
+  var h = hex.replace('#','');
+  if (h.length === 3) h = h[0]+h[0]+h[1]+h[1]+h[2]+h[2];
+  var r=Math.max(0,parseInt(h.slice(0,2),16)-amt);
+  var g=Math.max(0,parseInt(h.slice(2,4),16)-amt);
+  var b=Math.max(0,parseInt(h.slice(4,6),16)-amt);
+  return '#'+[r,g,b].map(function(v){return v.toString(16).padStart(2,'0');}).join('');
+}
+function heartSVG(filled) {
+  var f = filled ? '#e03e3e' : 'none', s = filled ? '#e03e3e' : 'currentColor';
+  return '<svg class="heart-icon" width="15" height="15" viewBox="0 0 24 24" fill="'+f+'" stroke="'+s+'" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>';
+}
+function chatSVG() {
+  return '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>';
+}
+function trashSVG() {
+  return '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4h6v2"/></svg>';
+}
+function moreSVG() {
+  return '<svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="19" cy="12" r="1.5"/></svg>';
+}
+function flagSVG() {
+  return '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><line x1="4" y1="22" x2="4" y2="15"/></svg>';
+}
+// ── Link click handler ───────────────────────────────────────
+// Web:    create a real <a> and click it — opens a new tab
+// Mobile: window.open — Cogniss WebView intercepts and routes
+//         to the device's external browser via Linking.openURL
+document.addEventListener('click', function(e) {
+  var a = e.target.closest('a[href]');
+  if (!a) return;
+  var href = a.getAttribute('href');
+  if (!href || !href.match(/^https?:\/\//)) return;
+  e.preventDefault();
+  e.stopPropagation();
+  if (isNative) {
+    // Mobile — WebView catches this and opens external browser
+    window.open(href, '_blank');
+  } else {
+    // Web — programmatic anchor click guarantees a real new tab
+    var tmp = document.createElement('a');
+    tmp.href = href;
+    tmp.target = '_blank';
+    tmp.rel = 'noopener noreferrer';
+    document.body.appendChild(tmp);
+    tmp.click();
+    document.body.removeChild(tmp);
+  }
+});
+</script>
+</body>
+</html>
