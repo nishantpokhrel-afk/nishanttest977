@@ -1,0 +1,509 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Zulip Forum</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --brand:       #6c5ce7;
+      --brand-dark:  #5849c2;
+      --surface:     #f5f5f7;
+      --card:        #ffffff;
+      --text:        #1a1a2e;
+      --muted:       #6b7280;
+      --border:      #e5e7eb;
+      --danger:      #ef4444;
+      --radius:      12px;
+      --header-h:    56px;
+      --footer-h:    60px;
+    }
+
+    html, body {
+      height: 100%;
+      background: var(--surface);
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      color: var(--text);
+      overflow: hidden;
+    }
+
+    /* ── Layout ── */
+    #app {
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+    }
+
+    /* ── Header ── */
+    #header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      height: var(--header-h);
+      padding: 0 16px;
+      background: var(--card);
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+      gap: 10px;
+    }
+
+    #header-left {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      min-width: 0;
+    }
+
+    #zulip-logo {
+      width: 28px;
+      height: 28px;
+      flex-shrink: 0;
+    }
+
+    #header-title {
+      font-size: 16px;
+      font-weight: 700;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    #header-subtitle {
+      font-size: 12px;
+      color: var(--muted);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    #done-btn {
+      flex-shrink: 0;
+      padding: 8px 18px;
+      background: var(--brand);
+      color: #fff;
+      border: none;
+      border-radius: 20px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+    #done-btn:active { background: var(--brand-dark); }
+
+    /* ── States ── */
+    .state-screen {
+      display: none;
+      flex: 1;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 32px 24px;
+      text-align: center;
+      gap: 16px;
+    }
+    .state-screen.active { display: flex; }
+
+    .state-icon {
+      font-size: 48px;
+      line-height: 1;
+    }
+
+    .state-title {
+      font-size: 20px;
+      font-weight: 700;
+    }
+
+    .state-body {
+      font-size: 15px;
+      color: var(--muted);
+      line-height: 1.5;
+      max-width: 280px;
+    }
+
+    .spinner {
+      width: 40px;
+      height: 40px;
+      border: 3px solid var(--border);
+      border-top-color: var(--brand);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .retry-btn {
+      margin-top: 8px;
+      padding: 10px 24px;
+      background: var(--brand);
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      font-size: 15px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    .retry-btn:active { background: var(--brand-dark); }
+
+    /* ── Embed container ── */
+    #embed-screen {
+      display: none;
+      flex: 1;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    #embed-screen.active { display: flex; }
+
+    #zulip-container {
+      flex: 1;
+      overflow: hidden;
+      position: relative;
+    }
+
+    /* Zulip embed script renders a widget — give it full room */
+    #zulip-container > * {
+      width: 100% !important;
+      height: 100% !important;
+    }
+
+    /* Fallback iframe (if embed script unavailable) */
+    #zulip-fallback-iframe {
+      width: 100%;
+      height: 100%;
+      border: none;
+    }
+
+    /* ── Config missing banner ── */
+    #config-error {
+      display: none;
+      background: #fef2f2;
+      border: 1px solid #fecaca;
+      border-radius: 8px;
+      padding: 12px 16px;
+      font-size: 13px;
+      color: var(--danger);
+      margin: 16px;
+      text-align: left;
+    }
+    #config-error.show { display: block; }
+
+    /* ── Footer info bar ── */
+    #footer {
+      display: none;
+      height: var(--footer-h);
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      background: var(--card);
+      border-top: 1px solid var(--border);
+      flex-shrink: 0;
+      font-size: 12px;
+      color: var(--muted);
+    }
+    #footer.show { display: flex; }
+    #footer-stream-badge {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 4px 10px;
+      font-weight: 600;
+      font-size: 12px;
+    }
+  </style>
+</head>
+<body>
+
+<div id="app">
+
+  <!-- Header -->
+  <div id="header">
+    <div id="header-left">
+      <!-- Zulip logomark (inline SVG — no network needed) -->
+      <svg id="zulip-logo" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <rect width="40" height="40" rx="10" fill="#6c5ce7"/>
+        <path d="M10 12h13l-8 8h15" stroke="#fff" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"/>
+        <path d="M30 28H17l8-8H10" stroke="#fff" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+      <div>
+        <div id="header-title">Community Forum</div>
+        <div id="header-subtitle">Loading…</div>
+      </div>
+    </div>
+    <button id="done-btn" onclick="completeForum()">Done</button>
+  </div>
+
+  <!-- Loading state -->
+  <div id="loading-screen" class="state-screen active">
+    <div class="spinner"></div>
+    <div class="state-title">Loading Forum</div>
+    <div class="state-body">Connecting to your community…</div>
+  </div>
+
+  <!-- Config error state -->
+  <div id="error-screen" class="state-screen">
+    <div class="state-icon">⚠️</div>
+    <div class="state-title">Setup Required</div>
+    <div class="state-body" id="error-detail">Forum configuration is missing. Please contact your administrator.</div>
+  </div>
+
+  <!-- Network error state -->
+  <div id="network-screen" class="state-screen">
+    <div class="state-icon">📡</div>
+    <div class="state-title">Connection Failed</div>
+    <div class="state-body">Unable to reach the forum. Check your connection and try again.</div>
+    <button class="retry-btn" onclick="retryLoad()">Try Again</button>
+  </div>
+
+  <!-- Embed screen -->
+  <div id="embed-screen">
+    <div id="config-error"></div>
+    <div id="zulip-container"></div>
+    <div id="footer">
+      <span>Stream:</span>
+      <span id="footer-stream-badge">#general</span>
+    </div>
+  </div>
+
+</div>
+
+<script>
+  // ─────────────────────────────────────────
+  // Bridge
+  // ─────────────────────────────────────────
+  const isNative = typeof window.ReactNativeWebView !== 'undefined'
+
+  function postToApp(key, data = null) {
+    const text = JSON.stringify({ key, data })
+    if (isNative) {
+      window.ReactNativeWebView.postMessage(text)
+    } else {
+      window.parent.postMessage(text, '*')
+    }
+  }
+
+  function onMessage(event) {
+    try {
+      const message = JSON.parse(event.data)
+      if (!message || !message.key) return
+      handleMessage(message)
+    } catch (e) { /* ignore non-JSON */ }
+  }
+
+  // Android fires on document, iOS/web on window
+  document.addEventListener('message', onMessage)
+  window.addEventListener('message', onMessage)
+
+  // ─────────────────────────────────────────
+  // State
+  // ─────────────────────────────────────────
+  const state = { CONFIG: {}, USER: {}, ACTIVITY: {}, ready: false }
+  let startTime = Date.now()
+  let embedLoaded = false
+
+  function handleMessage(msg) {
+    switch (msg.key) {
+      case 'ACTIVITY':
+        state.ACTIVITY = msg.data || {}
+        break
+      case 'CONFIG':
+        state.CONFIG = msg.data || {}
+        break
+      case 'USER':
+        state.USER = msg.data || {}
+        break
+      case 'QUESTIONS':
+      case 'QUESTION':
+        // Display-only template — no questions expected, but guard anyway
+        if (!state.ready) startForum()
+        break
+    }
+
+    // Start as soon as CONFIG arrives (display-only — no questions needed)
+    if (msg.key === 'CONFIG' && !state.ready) {
+      startForum()
+    }
+  }
+
+  // ─────────────────────────────────────────
+  // Screens
+  // ─────────────────────────────────────────
+  function showScreen(id) {
+    ;['loading-screen', 'error-screen', 'network-screen', 'embed-screen'].forEach(s => {
+      const el = document.getElementById(s)
+      el.classList.remove('active')
+    })
+    document.getElementById(id).classList.add('active')
+  }
+
+  // ─────────────────────────────────────────
+  // Forum setup
+  // ─────────────────────────────────────────
+  function startForum() {
+    if (state.ready) return
+    state.ready = true
+
+    // All settings live in a single CONFIG.config JSON string
+    let cfg = {}
+    try {
+      cfg = JSON.parse(state.CONFIG.config || '{}')
+    } catch (e) {
+      showError('CONFIG.config is not valid JSON. Check the activity customConfig.')
+      return
+    }
+
+    // Required: Zulip server URL
+    const serverUrl = (cfg.zulipServerUrl || '').replace(/\/$/, '')
+    if (!serverUrl) {
+      showError('"zulipServerUrl" is required inside the config JSON. Example: https://yourorg.zulipchat.com')
+      return
+    }
+
+    // Optional with defaults
+    const stream     = cfg.stream     || 'general'
+    const topic      = cfg.topic      || ''
+    const title      = cfg.forumTitle || 'Community Forum'
+    const showFooter = cfg.showFooter !== false
+
+    // Update header
+    document.getElementById('header-title').textContent = title
+    document.getElementById('header-subtitle').textContent = serverUrl.replace('https://', '')
+
+    // Update footer
+    document.getElementById('footer-stream-badge').textContent = '#' + stream
+    if (showFooter) document.getElementById('footer').classList.add('show')
+
+    // Try Zulip embed widget first, fall back to iframe
+    loadZulipEmbed(serverUrl, stream, topic)
+  }
+
+  function loadZulipEmbed(serverUrl, stream, topic) {
+    const container = document.getElementById('zulip-container')
+
+    // The Zulip embed widget requires a div with specific data attributes
+    const widgetDiv = document.createElement('div')
+    widgetDiv.id = 'zulip-login-widget'
+    widgetDiv.setAttribute('data-server',   serverUrl)
+    widgetDiv.setAttribute('data-stream',   stream)
+    if (topic) widgetDiv.setAttribute('data-topic', topic)
+    widgetDiv.style.width  = '100%'
+    widgetDiv.style.height = '100%'
+    container.appendChild(widgetDiv)
+
+    // Load Zulip embed script
+    const script = document.createElement('script')
+    script.src = serverUrl + '/static/js/embed.js'
+    script.async = true
+
+    script.onload = () => {
+      embedLoaded = true
+      showScreen('embed-screen')
+      postToApp('LOG', { message: 'Zulip embed script loaded from ' + serverUrl })
+    }
+
+    script.onerror = () => {
+      postToApp('LOG', { message: 'Embed script failed — falling back to iframe' })
+      fallbackIframe(serverUrl, stream, topic)
+    }
+
+    // Timeout guard — if script takes >8s, fall back
+    const timeout = setTimeout(() => {
+      if (!embedLoaded) {
+        postToApp('LOG', { message: 'Embed script timeout — falling back to iframe' })
+        script.onload = null
+        script.onerror = null
+        fallbackIframe(serverUrl, stream, topic)
+      }
+    }, 8000)
+
+    script.onload = () => {
+      clearTimeout(timeout)
+      embedLoaded = true
+      showScreen('embed-screen')
+      postToApp('LOG', { message: 'Zulip embed loaded' })
+    }
+
+    document.head.appendChild(script)
+  }
+
+  function fallbackIframe(serverUrl, stream, topic) {
+    // Build a Zulip narrow URL so users land in the right stream/topic
+    let narrowUrl = serverUrl
+    if (stream) {
+      narrowUrl += '/#narrow/stream/' + encodeURIComponent(stream)
+      if (topic) narrowUrl += '/topic/' + encodeURIComponent(topic)
+    }
+
+    const container = document.getElementById('zulip-container')
+    container.innerHTML = '' // clear widget div
+
+    const iframe = document.createElement('iframe')
+    iframe.id  = 'zulip-fallback-iframe'
+    iframe.src = narrowUrl
+    iframe.setAttribute('allowfullscreen', 'false')
+
+    iframe.onload = () => {
+      showScreen('embed-screen')
+      postToApp('LOG', { message: 'Zulip fallback iframe loaded: ' + narrowUrl })
+    }
+
+    iframe.onerror = () => {
+      showScreen('network-screen')
+      postToApp('LOG', { message: 'Zulip iframe failed to load' })
+    }
+
+    container.appendChild(iframe)
+
+    // Show embed screen optimistically after 2s if onload hasn't fired
+    setTimeout(() => showScreen('embed-screen'), 2000)
+  }
+
+  function retryLoad() {
+    showScreen('loading-screen')
+    state.ready = false
+    embedLoaded = false
+    document.getElementById('zulip-container').innerHTML = ''
+    setTimeout(startForum, 500)
+  }
+
+  function showError(detail) {
+    document.getElementById('error-detail').textContent = detail
+    showScreen('error-screen')
+    postToApp('LOG', { message: 'Config error: ' + detail })
+    // Fatal config error — notify app
+    postToApp('ERROR', { message: detail })
+  }
+
+  // ─────────────────────────────────────────
+  // Completion
+  // ─────────────────────────────────────────
+  function completeForum() {
+    const duration = Math.round((Date.now() - startTime) / 1000)
+    postToApp('LOG', { message: 'Forum session ended after ' + duration + 's' })
+    postToApp('QUIT', { completeState: 'COMPLETE' })
+  }
+
+  // ─────────────────────────────────────────
+  // External link guard (mobile)
+  // Opens links in device browser, not WebView
+  // ─────────────────────────────────────────
+  document.addEventListener('click', function(e) {
+    const link = e.target.closest('a[href]')
+    if (link && !link.href.startsWith(window.location.origin)) {
+      link.setAttribute('target', '_blank')
+    }
+  })
+
+  // ─────────────────────────────────────────
+  // Init — signal ready (skip media preload)
+  // ─────────────────────────────────────────
+  postToApp('READY_DYNAMIC_MEDIA')
+
+  // Safety fallback: if no CONFIG arrives within 5s, show error
+  setTimeout(() => {
+    if (!state.ready) {
+      showError('No CONFIG received from Cogniss. Check the activity customConfig.')
+    }
+  }, 5000)
+</script>
+
+</body>
+</html>
