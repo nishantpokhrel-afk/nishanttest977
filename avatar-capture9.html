@@ -1,0 +1,370 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Avatar Capture</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { height: 100%; background: #f5f4f0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
+    body { display: flex; align-items: center; justify-content: center; min-height: 100%; }
+    .spinner { width: 36px; height: 36px; }
+    .spinner-track { fill: none; stroke: rgba(0,0,0,0.10); stroke-width: 3; }
+    .spinner-arc { fill: none; stroke: #0F6E56; stroke-width: 3; stroke-linecap: round; stroke-dasharray: 60 140; transform-origin: 18px 18px; animation: spin 0.9s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+  </style>
+</head>
+<body>
+
+  <svg class="spinner" viewBox="0 0 36 36">
+    <circle class="spinner-track" cx="18" cy="18" r="14"/>
+    <circle class="spinner-arc" cx="18" cy="18" r="14"/>
+  </svg>
+
+  <canvas id="c" style="display:none;"></canvas>
+
+  <script>
+    var isNative = typeof window.ReactNativeWebView !== 'undefined'
+
+    function postToApp(key, data) {
+      var text = JSON.stringify({ key: key, data: data === undefined ? null : data })
+      if (isNative) window.ReactNativeWebView.postMessage(text)
+      else window.parent.postMessage(text, '*')
+    }
+
+    var _reqId = 0
+    var _pending = {}
+    function restRequest(method, model, data) {
+      return new Promise(function(resolve, reject) {
+        var id = 'req-' + (++_reqId)
+        _pending[id] = { resolve: resolve, reject: reject }
+        var text = JSON.stringify({ key: 'REST_REQUEST', method: method, model: model, data: data, id: id, specialParams: null })
+        if (isNative) window.ReactNativeWebView.postMessage(text)
+        else window.parent.postMessage(text, '*')
+      })
+    }
+
+    var state = {}
+    var REQUIRED = ['API', 'USER', 'AUTH', 'ACTIVITY', 'ACTIVITY_RESPONSE']
+    var _started = false, hasQuit = false
+
+    function isReady() { return REQUIRED.every(function(k){ return state[k] !== undefined }) }
+    function tryRun() { if (!_started && isReady()) { _started = true; run().catch(function(e){ postToApp('ERROR', { message: e.message || 'Failed' }) }) } }
+    function delay(ms) { return new Promise(function(r){ setTimeout(r, ms) }) }
+
+    function getInitials(name) {
+      return (name || '?').split(' ').slice(0,2).map(function(w){ return w[0] || '' }).join('').toUpperCase()
+    }
+
+    function roundRect(ctx, x, y, w, h, r) {
+      ctx.beginPath()
+      ctx.moveTo(x+r, y); ctx.lineTo(x+w-r, y); ctx.quadraticCurveTo(x+w, y, x+w, y+r)
+      ctx.lineTo(x+w, y+h-r); ctx.quadraticCurveTo(x+w, y+h, x+w-r, y+h)
+      ctx.lineTo(x+r, y+h); ctx.quadraticCurveTo(x, y+h, x, y+h-r)
+      ctx.lineTo(x, y+r); ctx.quadraticCurveTo(x, y, x+r, y)
+      ctx.closePath()
+    }
+
+    function formatNum(n) {
+      if (n === undefined || n === null) return '—'
+      n = Number(n)
+      if (isNaN(n)) return '—'
+      if (n >= 1000000) return (n / 1000000).toFixed(1).replace(/\.0$/, '') + 'M'
+      if (n >= 1000) return (n / 1000).toFixed(1).replace(/\.0$/, '') + 'k'
+      return String(n)
+    }
+
+    // ── Resolve avatar URL ────────────────────────────────────────────────────
+    // Mirrors the exact approach used in the Google Sheets forum template:
+    // 1. Check known field names on profile and user objects directly
+    // 2. If a 24-char File ID found → fetch File record → get url
+    // 3. If nothing found → deep-search AppUser record as fallback
+
+    function resolveAvatarUrl() {
+      return new Promise(function(resolve) {
+        var u = state.USER || {}
+        var profile = u.profile || {}
+
+        postToApp('LOG', { userKeys: Object.keys(u), profileKeys: Object.keys(profile), profileVal: u.profile })
+
+        // Direct field lookups first — most reliable
+        var fileIdOrUrl =
+          profile.picture || profile.avatar || profile.image || profile.photo ||
+          profile.avatarUrl || profile.avatarFileId || profile.profilePicture ||
+          u.picture || u.avatar || u.photo || u.avatarUrl || ''
+
+        postToApp('LOG', { fileIdOrUrl: fileIdOrUrl })
+
+        function resolveCandidate(candidate, cb) {
+          if (!candidate) { cb(null); return }
+          if (typeof candidate === 'string' && /^https?:\/\//i.test(candidate)) {
+            cb(candidate); return
+          }
+          if (typeof candidate === 'string' && /^[a-f0-9]{24}$/i.test(candidate)) {
+            restRequest('get', 'File', candidate)
+              .then(function(file) {
+                postToApp('LOG', { fileRecord: file })
+                var url = file && (file.url || file.uri || file.downloadUrl || file.src)
+                cb(url || null)
+              })
+              .catch(function(e) { postToApp('LOG', { fileError: e.message }); cb(null) })
+            return
+          }
+          cb(null)
+        }
+
+        resolveCandidate(fileIdOrUrl, function(url) {
+          if (url) { resolve(url); return }
+
+          // Fallback: fetch AppUser and deep-search it for any image URL or File ID
+          restRequest('list', 'AppUser', { user: u.id })
+            .then(function(result) {
+              postToApp('LOG', { appUserResult: result })
+              var au = (result && result.items && result.items[0]) || (result && result.id ? result : null)
+              if (!au) { resolve(null); return }
+
+              function findInObj(obj, depth) {
+                if (!obj || depth > 4) return null
+                if (typeof obj === 'string') {
+                  if (/^https?:\/\/.+\.(jpg|jpeg|png|gif|webp)/i.test(obj)) return obj
+                  if (/^[a-f0-9]{24}$/i.test(obj)) return obj
+                  return null
+                }
+                if (typeof obj !== 'object') return null
+                var priority = ['picture','avatar','image','photo','avatarUrl','profilePicture','profile']
+                for (var pi = 0; pi < priority.length; pi++) {
+                  if (obj[priority[pi]]) { var r = findInObj(obj[priority[pi]], depth+1); if (r) return r }
+                }
+                var keys = Object.keys(obj)
+                for (var ki = 0; ki < keys.length; ki++) {
+                  if (priority.indexOf(keys[ki]) >= 0) continue
+                  var r2 = findInObj(obj[keys[ki]], depth+1); if (r2) return r2
+                }
+                return null
+              }
+
+              var candidate = findInObj(au, 0)
+              postToApp('LOG', { appUserCandidate: candidate })
+              resolveCandidate(candidate, function(auUrl) { resolve(auUrl) })
+            })
+            .catch(function(e) { postToApp('LOG', { appUserError: e.message }); resolve(null) })
+        })
+      })
+    }
+
+    // ── Load image — tries with crossOrigin, fallback without ─────────────────
+
+    function loadImage(url) {
+      return new Promise(function(resolve, reject) {
+        var img = new Image()
+        img.crossOrigin = 'anonymous'
+        img.onload = function() { resolve(img) }
+        img.onerror = function() {
+          // Retry without crossOrigin (canvas will be tainted but we'll handle that)
+          var img2 = new Image()
+          img2.onload = function() { resolve(img2) }
+          img2.onerror = function() { reject(new Error('Image load failed: ' + url)) }
+          img2.src = url
+        }
+        img.src = url
+      })
+    }
+
+    // ── Card drawing ──────────────────────────────────────────────────────────
+
+    function drawCard(avatarImg, user, appUser) {
+      var SCALE = 2          // 3x for crisp mobile retina
+      var LW    = 750        // logical width
+      var W     = LW * SCALE
+
+      var displayName = user.displayName || user.username || 'User'
+      var xp    = (appUser && appUser.xp    != null) ? appUser.xp    : user.xp
+      var coins = (appUser && appUser.coins != null) ? appUser.coins : user.coins
+
+      // Layout — all in logical px
+      var AX    = LW / 2
+      var AY    = 170
+      var AR    = 110
+      var nameY = AY + AR + 56
+      var divY  = nameY + 36
+      var statH = 110
+      var statW = 300
+      var statGap = 30
+      var statY = divY + 32
+      var H     = (statY + statH + 60) * SCALE
+
+      var canvas = document.getElementById('c')
+      canvas.width  = W
+      canvas.height = H
+      var ctx = canvas.getContext('2d')
+      ctx.scale(SCALE, SCALE)
+      ctx.clearRect(0, 0, LW, H / SCALE)
+
+      // Glow behind avatar
+      ctx.beginPath()
+      ctx.arc(AX, AY, AR + 12, 0, Math.PI * 2)
+      ctx.fillStyle = 'rgba(29,158,117,0.08)'
+      ctx.fill()
+
+      // Avatar circle
+      ctx.save()
+      ctx.beginPath()
+      ctx.arc(AX, AY, AR, 0, Math.PI * 2)
+      ctx.clip()
+
+      var drewPhoto = false
+      if (avatarImg) {
+        try {
+          var s = Math.max((AR*2) / avatarImg.width, (AR*2) / avatarImg.height)
+          ctx.drawImage(avatarImg, AX - avatarImg.width*s/2, AY - avatarImg.height*s/2, avatarImg.width*s, avatarImg.height*s)
+          drewPhoto = true
+        } catch(e) { postToApp('LOG', { drawErr: e.message }) }
+      }
+
+      if (!drewPhoto) {
+        ctx.fillStyle = '#1D9E75'
+        ctx.fillRect(AX-AR, AY-AR, AR*2, AR*2)
+        ctx.restore()
+        ctx.save()
+        ctx.font = '500 72px -apple-system, BlinkMacSystemFont, sans-serif'
+        ctx.fillStyle = '#ffffff'
+        ctx.textAlign = 'center'
+        ctx.textBaseline = 'middle'
+        ctx.fillText(getInitials(displayName), AX, AY)
+      }
+      ctx.restore()
+
+      // Avatar border
+      ctx.beginPath()
+      ctx.arc(AX, AY, AR, 0, Math.PI * 2)
+      ctx.strokeStyle = 'rgba(15,110,86,0.2)'
+      ctx.lineWidth = 3
+      ctx.stroke()
+
+      // Display name
+      ctx.font = '500 38px -apple-system, BlinkMacSystemFont, sans-serif'
+      ctx.fillStyle = '#1a1a18'
+      ctx.textAlign = 'center'
+      ctx.textBaseline = 'alphabetic'
+      ctx.fillText(displayName, AX, nameY)
+
+      // Divider
+      ctx.beginPath()
+      ctx.moveTo(80, divY); ctx.lineTo(LW - 80, divY)
+      ctx.strokeStyle = 'rgba(0,0,0,0.07)'
+      ctx.lineWidth = 1
+      ctx.stroke()
+
+      // Stat blocks — XP and Coins only
+      var totalW = statW * 2 + statGap
+      var leftX  = AX - totalW / 2
+      var rightX = leftX + statW + statGap
+
+      function drawStat(x, label, value, accent, bg) {
+        roundRect(ctx, x, statY, statW, statH, 20)
+        ctx.fillStyle = bg; ctx.fill()
+        ctx.font = '500 34px -apple-system, BlinkMacSystemFont, sans-serif'
+        ctx.fillStyle = accent
+        ctx.textAlign = 'center'; ctx.textBaseline = 'alphabetic'
+        ctx.fillText(formatNum(value), x + statW/2, statY + 58)
+        ctx.font = '400 16px -apple-system, BlinkMacSystemFont, sans-serif'
+        ctx.fillStyle = 'rgba(0,0,0,0.38)'
+        ctx.fillText(label, x + statW/2, statY + 82)
+      }
+
+      drawStat(leftX,  'XP',    xp,    '#0F6E56', '#E1F5EE')
+      drawStat(rightX, 'Coins', coins, '#854F0B', '#FAEEDA')
+
+      return canvas
+    }
+
+    // ── Main ──────────────────────────────────────────────────────────────────
+
+    async function run() {
+      var user  = state.USER
+      var api   = state.API
+      var token = state.AUTH
+
+      // 1. Resolve avatar URL using proven forum approach
+      var avatarUrl = await resolveAvatarUrl()
+      postToApp('LOG', { finalAvatarUrl: avatarUrl })
+
+      // 2. Load the image
+      var avatarImg = null
+      if (avatarUrl) {
+        try { avatarImg = await loadImage(avatarUrl) }
+        catch(e) { postToApp('LOG', { loadErr: e.message }) }
+      }
+
+      // 3. Fetch live AppUser for XP/coins
+      var appUser = null
+      try {
+        var au = await restRequest('list', 'AppUser', { user: user.id })
+        appUser = (au && au.items && au.items[0]) || (au && au.id ? au : null)
+      } catch(e) {}
+
+      // 4. Draw card
+      var canvas = drawCard(avatarImg, user, appUser)
+
+      // 5. Export PNG
+      var blob = await canvasToBlob(canvas)
+
+      // 6. Upload
+      var fd = new FormData()
+      fd.append('file', blob, 'profile_card_' + (user.id||'user') + '_' + Date.now() + '.png')
+
+      var uploadRes = await fetch(api + '/api/v1/files', {
+        method: 'POST',
+        headers: { Authorization: 'Bearer ' + token },
+        body: fd
+      })
+      var uploadBody = await uploadRes.text()
+      postToApp('LOG', { uploadStatus: uploadRes.status })
+      if (!uploadRes.ok) throw new Error('Upload failed: ' + uploadRes.status)
+
+      var fileId = (JSON.parse(uploadBody)._id || JSON.parse(uploadBody).id)
+      if (!fileId) throw new Error('No file ID returned')
+
+      // 7. Submit image response
+      postToApp('QUESTION_RESPONSE', { index: 0, image: fileId, duration: 1 })
+      await delay(500)
+
+      if (!hasQuit) { hasQuit = true; postToApp('QUIT', { completeState: 'COMPLETE' }) }
+    }
+
+    function canvasToBlob(canvas) {
+      return new Promise(function(resolve, reject) {
+        canvas.toBlob(function(b) { b ? resolve(b) : reject(new Error('toBlob failed')) }, 'image/png')
+      })
+    }
+
+    function handleMessage(message) {
+      switch (message.key) {
+        case 'API': case 'USER': case 'AUTH': case 'TEMPLATE': case 'TEMPLATE_VARIATION':
+        case 'ACTIVITY': case 'ACTIVITY_RESPONSE': case 'USER_ACTIVITY': case 'CONFIG': case 'CONTENT':
+          state[message.key] = message.data; break
+        case 'QUESTIONS': state.QUESTIONS = message.data; break
+        case 'QUESTION': if (!state.QUESTIONS) state.QUESTIONS = message.data ? [message.data] : []; break
+        case 'REQUEST_RESPONSE': {
+          var p = _pending[message.id]
+          if (p) { delete _pending[message.id]; message.error ? p.reject(new Error(message.error)) : p.resolve(message.data) }
+          break
+        }
+      }
+      tryRun()
+    }
+
+    function onMessage(e) {
+      try {
+        if (!e.data) return
+        var m = typeof e.data === 'string' ? JSON.parse(e.data) : e.data
+        if (m && m.key) handleMessage(m)
+      } catch(e) {}
+    }
+
+    document.addEventListener('message', onMessage)
+    window.addEventListener('message', onMessage)
+    postToApp('READY_DYNAMIC_MEDIA')
+  </script>
+</body>
+</html>
