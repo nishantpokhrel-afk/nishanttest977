@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Avatar Capture</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { height: 100%; background: #f5f4f0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
+    body { display: flex; align-items: center; justify-content: center; min-height: 100%; }
+    .spinner { width: 36px; height: 36px; }
+    .spinner-track { fill: none; stroke: rgba(0,0,0,0.10); stroke-width: 3; }
+    .spinner-arc { fill: none; stroke: #0F6E56; stroke-width: 3; stroke-linecap: round; stroke-dasharray: 60 140; transform-origin: 18px 18px; animation: spin 0.9s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+  </style>
+</head>
+<body>
+
+  <svg class="spinner" viewBox="0 0 36 36">
+    <circle class="spinner-track" cx="18" cy="18" r="14"/>
+    <circle class="spinner-arc" cx="18" cy="18" r="14"/>
+  </svg>
+
+  <canvas id="c" style="display:none;"></canvas>
+
+  <script>
+    const isNative = typeof window.ReactNativeWebView !== 'undefined'
+
+    function postToApp(key, data) {
+      const text = JSON.stringify({ key, data: data === undefined ? null : data })
+      if (isNative) window.ReactNativeWebView.postMessage(text)
+      else window.parent.postMessage(text, '*')
+    }
+
+    let _reqId = 0
+    const _pending = {}
+    function restRequest(method, model, data) {
+      return new Promise(function(resolve, reject) {
+        const id = 'req-' + (++_reqId)
+        _pending[id] = { resolve, reject }
+        const text = JSON.stringify({ key: 'REST_REQUEST', method, model, data, id, specialParams: null })
+        if (isNative) window.ReactNativeWebView.postMessage(text)
+        else window.parent.postMessage(text, '*')
+      })
+    }
+
+    const state = {}
+    const REQUIRED = ['API', 'USER', 'AUTH', 'ACTIVITY', 'ACTIVITY_RESPONSE', '_Q']
+    let _started = false, hasQuit = false
+
+    function isReady() { return REQUIRED.every(function(k){ return state[k] !== undefined }) }
+    function tryRun() { if (!_started && isReady()) { _started = true; run().catch(function(e){ postToApp('ERROR', { message: e.message || 'Failed' }) }) } }
+    function delay(ms) { return new Promise(function(r){ setTimeout(r, ms) }) }
+
+    // ── Card drawing ─────────────────────────────────────────────────────────
+
+    function getInitials(name) {
+      return (name || '?').split(' ').slice(0,2).map(function(w){ return w[0] || '' }).join('').toUpperCase()
+    }
+
+    function nameToHue(name) {
+      return Array.from(name || '').reduce(function(a,c){ return a + c.charCodeAt(0) }, 0) % 360
+    }
+
+    function drawCard(avatarImg, displayName, username) {
+      const W = 560, H = 200, R = 16
+      const canvas = document.getElementById('c')
+      canvas.width = W
+      canvas.height = H
+      const ctx = canvas.getContext('2d')
+
+      // Card background
+      ctx.beginPath()
+      ctx.moveTo(R,0); ctx.lineTo(W-R,0); ctx.quadraticCurveTo(W,0,W,R)
+      ctx.lineTo(W,H-R); ctx.quadraticCurveTo(W,H,W-R,H)
+      ctx.lineTo(R,H); ctx.quadraticCurveTo(0,H,0,H-R)
+      ctx.lineTo(0,R); ctx.quadraticCurveTo(0,0,R,0)
+      ctx.closePath()
+      ctx.fillStyle = '#ffffff'
+      ctx.fill()
+      ctx.strokeStyle = 'rgba(0,0,0,0.09)'
+      ctx.lineWidth = 1
+      ctx.stroke()
+
+      // Avatar circle
+      const AX = 48, AY = H/2, AR = 44
+      ctx.save()
+      ctx.beginPath()
+      ctx.arc(AX, AY, AR, 0, Math.PI*2)
+      ctx.closePath()
+      ctx.clip()
+
+      if (avatarImg) {
+        const scale = Math.max((AR*2)/avatarImg.width, (AR*2)/avatarImg.height)
+        const iw = avatarImg.width*scale, ih = avatarImg.height*scale
+        ctx.drawImage(avatarImg, AX-iw/2, AY-ih/2, iw, ih)
+      } else {
+        const hue = nameToHue(displayName)
+        ctx.fillStyle = 'hsl('+hue+', 50%, 68%)'
+        ctx.fillRect(AX-AR, AY-AR, AR*2, AR*2)
+        ctx.restore()
+        ctx.save()
+        ctx.font = '500 28px -apple-system, BlinkMacSystemFont, sans-serif'
+        ctx.fillStyle = 'rgba(255,255,255,0.92)'
+        ctx.textAlign = 'center'
+        ctx.textBaseline = 'middle'
+        ctx.fillText(getInitials(displayName), AX, AY)
+      }
+      ctx.restore()
+
+      // Avatar ring
+      ctx.beginPath()
+      ctx.arc(AX, AY, AR, 0, Math.PI*2)
+      ctx.strokeStyle = 'rgba(0,0,0,0.08)'
+      ctx.lineWidth = 1.5
+      ctx.stroke()
+
+      // Display name
+      const TX = AX + AR + 24
+      ctx.font = '500 22px -apple-system, BlinkMacSystemFont, sans-serif'
+      ctx.fillStyle = '#1a1a18'
+      ctx.textAlign = 'left'
+      ctx.textBaseline = 'alphabetic'
+      ctx.fillText(displayName || '', TX, AY - 8)
+
+      // Username
+      if (username) {
+        ctx.font = '400 15px -apple-system, BlinkMacSystemFont, sans-serif'
+        ctx.fillStyle = '#888780'
+        ctx.fillText('@' + username, TX, AY + 16)
+      }
+
+      // Teal accent bar
+      const SW=4, SR=2, sx=W-28, sy=AY-28, sh=56
+      ctx.beginPath()
+      ctx.moveTo(sx+SR,sy); ctx.lineTo(sx+SW-SR,sy); ctx.quadraticCurveTo(sx+SW,sy,sx+SW,sy+SR)
+      ctx.lineTo(sx+SW,sy+sh-SR); ctx.quadraticCurveTo(sx+SW,sy+sh,sx+SW-SR,sy+sh)
+      ctx.lineTo(sx+SR,sy+sh); ctx.quadraticCurveTo(sx,sy+sh,sx,sy+sh-SR)
+      ctx.lineTo(sx,sy+SR); ctx.quadraticCurveTo(sx,sy,sx+SR,sy)
+      ctx.closePath()
+      ctx.fillStyle = '#1D9E75'
+      ctx.fill()
+
+      return canvas
+    }
+
+    // ── Main ──────────────────────────────────────────────────────────────────
+
+    async function run() {
+      const user = state.USER
+      const api  = state.API
+      const token = state.AUTH
+
+      // 1. Try to load the user's existing avatar photo
+      let avatarImg = null
+      if (user.profile) {
+        try {
+          const file = await restRequest('get', 'File', user.profile)
+          if (file && file.url) avatarImg = await loadImage(file.url)
+        } catch(e) {
+          if (typeof user.profile === 'string' && user.profile.startsWith('http')) {
+            try { avatarImg = await loadImage(user.profile) } catch(_) {}
+          }
+        }
+      }
+
+      // 2. Draw the card onto canvas
+      const canvas = drawCard(
+        avatarImg,
+        user.displayName || user.username || 'User',
+        user.username || null
+      )
+
+      // 3. Export canvas as PNG blob
+      const blob = await canvasToBlob(canvas)
+
+      // 4. Upload the PNG as a File record via direct HTTP
+      const filename = 'avatar_card_' + (user.id || 'user') + '_' + Date.now() + '.png'
+      const fd = new FormData()
+      fd.append('file', blob, filename)
+
+      const uploadRes = await fetch(api + '/api/v1/files', {
+        method: 'POST',
+        headers: { Authorization: 'Bearer ' + token },
+        body: fd
+      })
+      if (!uploadRes.ok) throw new Error('File upload failed: ' + uploadRes.status)
+
+      const uploadedFile = await uploadRes.json()
+      const fileId = uploadedFile._id || uploadedFile.id
+      if (!fileId) throw new Error('No file ID in upload response')
+
+      // 5. POST a QuestionResponse with image: fileId directly via REST
+      const qrRes = await fetch(api + '/api/v1/questionresponses', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: 'Bearer ' + token
+        },
+        body: JSON.stringify({
+          question: state.QUESTIONS[0]._id || state.QUESTIONS[0].id,
+          image: fileId,
+          parentActivityResponse: state.ACTIVITY_RESPONSE.id,
+          duration: 1
+        })
+      })
+      if (!qrRes.ok) throw new Error('QuestionResponse POST failed: ' + qrRes.status)
+
+      // 6. Mark ActivityResponse complete then EXIT
+      const arRes = await fetch(api + '/api/v1/activityresponses/' + state.ACTIVITY_RESPONSE.id, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: 'Bearer ' + token
+        },
+        body: JSON.stringify({ complete: true, completeState: 'COMPLETE' })
+      })
+      if (!arRes.ok) throw new Error('ActivityResponse PUT failed: ' + arRes.status)
+
+      await delay(300)
+
+      // 7. EXIT — we've managed all persistence ourselves
+      if (!hasQuit) {
+        hasQuit = true
+        postToApp('EXIT', null)
+      }
+    }
+
+    function loadImage(url) {
+      return new Promise(function(resolve, reject) {
+        const img = new Image()
+        img.crossOrigin = 'anonymous'
+        img.onload = function() { resolve(img) }
+        img.onerror = function() { reject(new Error('Image load failed')) }
+        img.src = url
+      })
+    }
+
+    function canvasToBlob(canvas) {
+      return new Promise(function(resolve, reject) {
+        canvas.toBlob(function(b) { b ? resolve(b) : reject(new Error('toBlob failed')) }, 'image/png')
+      })
+    }
+
+    function handleMessage(message) {
+      switch (message.key) {
+        case 'API': case 'USER': case 'AUTH': case 'TEMPLATE': case 'TEMPLATE_VARIATION':
+        case 'ACTIVITY': case 'ACTIVITY_RESPONSE': case 'USER_ACTIVITY': case 'CONFIG': case 'CONTENT':
+          state[message.key] = message.data; break
+        case 'QUESTIONS':
+          state.QUESTIONS = message.data; state._Q = true; break
+        case 'QUESTION':
+          if (!state._Q) { state.QUESTIONS = message.data ? [message.data] : []; state._Q = true }
+          break
+        case 'REQUEST_RESPONSE': {
+          const p = _pending[message.id]
+          if (p) { delete _pending[message.id]; message.error ? p.reject(new Error(message.error)) : p.resolve(message.data) }
+          break
+        }
+      }
+      tryRun()
+    }
+
+    function onMessage(e) {
+      try {
+        if (!e.data) return
+        const m = typeof e.data === 'string' ? JSON.parse(e.data) : e.data
+        if (m && m.key) handleMessage(m)
+      } catch(_) {}
+    }
+
+    document.addEventListener('message', onMessage)
+    window.addEventListener('message', onMessage)
+    postToApp('READY_DYNAMIC_MEDIA')
+  </script>
+</body>
+</html>
