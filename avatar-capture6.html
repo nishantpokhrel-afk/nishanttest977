@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Avatar Capture</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { height: 100%; background: #f5f4f0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
+    body { display: flex; align-items: center; justify-content: center; min-height: 100%; }
+    .spinner { width: 36px; height: 36px; }
+    .spinner-track { fill: none; stroke: rgba(0,0,0,0.10); stroke-width: 3; }
+    .spinner-arc { fill: none; stroke: #0F6E56; stroke-width: 3; stroke-linecap: round; stroke-dasharray: 60 140; transform-origin: 18px 18px; animation: spin 0.9s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+  </style>
+</head>
+<body>
+
+  <svg class="spinner" viewBox="0 0 36 36">
+    <circle class="spinner-track" cx="18" cy="18" r="14"/>
+    <circle class="spinner-arc" cx="18" cy="18" r="14"/>
+  </svg>
+
+  <canvas id="c" style="display:none;"></canvas>
+
+  <script>
+    var isNative = typeof window.ReactNativeWebView !== 'undefined'
+
+    function postToApp(key, data) {
+      var text = JSON.stringify({ key: key, data: data === undefined ? null : data })
+      if (isNative) window.ReactNativeWebView.postMessage(text)
+      else window.parent.postMessage(text, '*')
+    }
+
+    var _reqId = 0
+    var _pending = {}
+    function restRequest(method, model, data) {
+      return new Promise(function(resolve, reject) {
+        var id = 'req-' + (++_reqId)
+        _pending[id] = { resolve: resolve, reject: reject }
+        var text = JSON.stringify({ key: 'REST_REQUEST', method: method, model: model, data: data, id: id, specialParams: null })
+        if (isNative) window.ReactNativeWebView.postMessage(text)
+        else window.parent.postMessage(text, '*')
+      })
+    }
+
+    var state = {}
+    var REQUIRED = ['API', 'USER', 'AUTH', 'ACTIVITY', 'ACTIVITY_RESPONSE']
+    var _started = false, hasQuit = false
+
+    function isReady() { return REQUIRED.every(function(k){ return state[k] !== undefined }) }
+    function tryRun() { if (!_started && isReady()) { _started = true; run().catch(function(e){ postToApp('ERROR', { message: e.message || 'Failed' }) }) } }
+    function delay(ms) { return new Promise(function(r){ setTimeout(r, ms) }) }
+
+    function getInitials(name) {
+      return (name || '?').split(' ').slice(0,2).map(function(w){ return w[0] || '' }).join('').toUpperCase()
+    }
+
+    function roundRect(ctx, x, y, w, h, r) {
+      ctx.beginPath()
+      ctx.moveTo(x+r, y); ctx.lineTo(x+w-r, y); ctx.quadraticCurveTo(x+w, y, x+w, y+r)
+      ctx.lineTo(x+w, y+h-r); ctx.quadraticCurveTo(x+w, y+h, x+w-r, y+h)
+      ctx.lineTo(x+r, y+h); ctx.quadraticCurveTo(x, y+h, x, y+h-r)
+      ctx.lineTo(x, y+r); ctx.quadraticCurveTo(x, y, x+r, y)
+      ctx.closePath()
+    }
+
+    function formatNum(n) {
+      if (n === undefined || n === null) return '—'
+      n = Number(n)
+      if (isNaN(n)) return '—'
+      if (n >= 1000000) return (n / 1000000).toFixed(1).replace(/\.0$/, '') + 'M'
+      if (n >= 1000) return (n / 1000).toFixed(1).replace(/\.0$/, '') + 'k'
+      return String(n)
+    }
+
+    // ── Load image ────────────────────────────────────────────────────────────
+    // Try with crossOrigin first (needed for canvas export), fallback without
+
+    function loadImage(url) {
+      return new Promise(function(resolve, reject) {
+        var img = new Image()
+        img.crossOrigin = 'anonymous'
+        img.onload = function() { resolve(img) }
+        img.onerror = function() {
+          var img2 = new Image()
+          img2.onload = function() { resolve(img2) }
+          img2.onerror = function() { reject(new Error('Image failed: ' + url)) }
+          img2.src = url
+        }
+        img.src = url
+      })
+    }
+
+    // ── Card drawing ──────────────────────────────────────────────────────────
+
+    function drawCard(avatarImg, user, appUser) {
+      // High resolution: 2x scale drawn at logical 750px wide
+      var SCALE = 2
+      var LW    = 750   // logical width
+      var W     = LW * SCALE
+
+      var displayName = user.displayName || user.username || 'User'
+
+      // Live values from AppUser (fallback to USER snapshot)
+      var xp    = (appUser && appUser.xp    != null) ? appUser.xp    : user.xp
+      var coins = (appUser && appUser.coins != null) ? appUser.coins : user.coins
+
+      // Also grab first custom currency if present
+      var currencies = appUser && appUser.currencies
+      var extraStats = []
+      if (currencies) {
+        var keys = Object.keys(currencies)
+        for (var i = 0; i < Math.min(keys.length, 1); i++) {
+          extraStats.push({ label: keys[i], value: currencies[keys[i]] })
+        }
+      }
+
+      // Layout (logical px)
+      var AX    = LW / 2
+      var AY    = 160
+      var AR    = 110
+      var nameY = AY + AR + 52
+      var divY  = nameY + 30
+
+      var statCount = 2 + extraStats.length
+      var statH     = 100
+      var statGap   = 24
+      var statW     = Math.min(220, (LW - 80 - statGap * (statCount - 1)) / statCount)
+      var totalStatW = statW * statCount + statGap * (statCount - 1)
+      var statStartX = (LW - totalStatW) / 2
+      var statY     = divY + 28
+      var H         = (statY + statH + 60) * SCALE
+
+      var canvas = document.getElementById('c')
+      canvas.width  = W
+      canvas.height = H
+      var ctx = canvas.getContext('2d')
+      ctx.scale(SCALE, SCALE)
+      ctx.clearRect(0, 0, LW, H / SCALE)
+
+      // ── Glow ring behind avatar ────────────
+      ctx.beginPath()
+      ctx.arc(AX, AY, AR + 10, 0, Math.PI * 2)
+      ctx.fillStyle = 'rgba(29,158,117,0.08)'
+      ctx.fill()
+
+      // ── Avatar ────────────────────────────
+      ctx.save()
+      ctx.beginPath()
+      ctx.arc(AX, AY, AR, 0, Math.PI * 2)
+      ctx.clip()
+
+      var drewPhoto = false
+      if (avatarImg) {
+        try {
+          var scale = Math.max((AR*2) / avatarImg.width, (AR*2) / avatarImg.height)
+          var iw = avatarImg.width * scale, ih = avatarImg.height * scale
+          ctx.drawImage(avatarImg, AX - iw/2, AY - ih/2, iw, ih)
+          drewPhoto = true
+        } catch(e) {}
+      }
+
+      if (!drewPhoto) {
+        ctx.fillStyle = '#1D9E75'
+        ctx.fillRect(AX - AR, AY - AR, AR*2, AR*2)
+        ctx.restore()
+        ctx.save()
+        ctx.font = '500 70px -apple-system, BlinkMacSystemFont, sans-serif'
+        ctx.fillStyle = '#ffffff'
+        ctx.textAlign = 'center'
+        ctx.textBaseline = 'middle'
+        ctx.fillText(getInitials(displayName), AX, AY)
+      }
+      ctx.restore()
+
+      // Avatar border
+      ctx.beginPath()
+      ctx.arc(AX, AY, AR, 0, Math.PI * 2)
+      ctx.strokeStyle = 'rgba(15,110,86,0.25)'
+      ctx.lineWidth = 3
+      ctx.stroke()
+
+      // ── Display name ───────────────────────
+      ctx.font = '500 36px -apple-system, BlinkMacSystemFont, sans-serif'
+      ctx.fillStyle = '#1a1a18'
+      ctx.textAlign = 'center'
+      ctx.textBaseline = 'alphabetic'
+      ctx.fillText(displayName, AX, nameY)
+
+      // ── Divider ───────────────────────────
+      ctx.beginPath()
+      ctx.moveTo(60, divY)
+      ctx.lineTo(LW - 60, divY)
+      ctx.strokeStyle = 'rgba(0,0,0,0.07)'
+      ctx.lineWidth = 1
+      ctx.stroke()
+
+      // ── Stat blocks ───────────────────────
+      function drawStat(x, label, value, accent, bg) {
+        roundRect(ctx, x, statY, statW, statH, 20)
+        ctx.fillStyle = bg
+        ctx.fill()
+        ctx.font = '500 32px -apple-system, BlinkMacSystemFont, sans-serif'
+        ctx.fillStyle = accent
+        ctx.textAlign = 'center'
+        ctx.textBaseline = 'alphabetic'
+        ctx.fillText(formatNum(value), x + statW / 2, statY + 54)
+        ctx.font = '400 15px -apple-system, BlinkMacSystemFont, sans-serif'
+        ctx.fillStyle = 'rgba(0,0,0,0.38)'
+        ctx.fillText(label, x + statW / 2, statY + 76)
+      }
+
+      drawStat(statStartX,           'XP',    xp,    '#0F6E56', '#E1F5EE')
+      drawStat(statStartX + statW + statGap, 'Coins', coins, '#854F0B', '#FAEEDA')
+
+      for (var i = 0; i < extraStats.length; i++) {
+        var ex = extraStats[i]
+        drawStat(statStartX + (statW + statGap) * (2 + i), ex.label, ex.value, '#534AB7', '#EEEDFE')
+      }
+
+      return canvas
+    }
+
+    // ── Main ──────────────────────────────────────────────────────────────────
+
+    async function run() {
+      var user  = state.USER
+      var api   = state.API
+      var token = state.AUTH
+
+      postToApp('LOG', { fullUser: user })
+
+      // Deep-search an object for a direct image URL or a 24-char Cogniss File ID
+      var AVATAR_KEYS = ['picture','avatar','image','photo','avatarUrl','profilePicture',
+                         'avatarFileId','profile','profileImage','icon','thumbnail']
+
+      function deepFindAvatar(obj, depth) {
+        if (!obj || depth > 4) return null
+        if (typeof obj === 'string') {
+          if (/^https?:\/\/.+\.(jpg|jpeg|png|gif|webp)/i.test(obj)) return { type: 'url', value: obj }
+          if (/^[a-f0-9]{24}$/i.test(obj)) return { type: 'id', value: obj }
+          return null
+        }
+        if (typeof obj !== 'object') return null
+        for (var ki = 0; ki < AVATAR_KEYS.length; ki++) {
+          var kv = obj[AVATAR_KEYS[ki]]
+          if (kv) { var found = deepFindAvatar(kv, depth + 1); if (found) return found }
+        }
+        var keys = Object.keys(obj)
+        for (var i = 0; i < keys.length; i++) {
+          if (AVATAR_KEYS.indexOf(keys[i]) >= 0) continue
+          var result = deepFindAvatar(obj[keys[i]], depth + 1)
+          if (result) return result
+        }
+        return null
+      }
+
+      async function resolveAvatarUrl(obj, label) {
+        var candidate = deepFindAvatar(obj, 0)
+        postToApp('LOG', { searchedIn: label, candidate: candidate })
+        if (!candidate) return null
+        if (candidate.type === 'url') return candidate.value
+        try {
+          var file = await restRequest('get', 'File', candidate.value)
+          postToApp('LOG', { fileRecord: file })
+          return (file && (file.url || file.uri || file.downloadUrl || file.src)) || null
+        } catch(e) {
+          postToApp('LOG', { fileError: e.message })
+          return null
+        }
+      }
+
+      // 1. Fetch live AppUser data
+      var appUser = null
+      try {
+        var auResult = await restRequest('list', 'AppUser', { user: user.id })
+        postToApp('LOG', { appUserResult: auResult })
+        if (auResult && auResult.items && auResult.items.length > 0) {
+          appUser = auResult.items[0]
+        } else if (auResult && auResult.id) {
+          appUser = auResult
+        }
+      } catch(e) {
+        postToApp('LOG', { appUserError: e.message })
+      }
+
+      // 2. Load avatar — deep search USER first, then AppUser
+      var avatarImg = null
+      try {
+        var avatarUrl = await resolveAvatarUrl(user, 'USER')
+        if (!avatarUrl && appUser) avatarUrl = await resolveAvatarUrl(appUser, 'AppUser')
+        postToApp('LOG', { finalAvatarUrl: avatarUrl })
+        if (avatarUrl) avatarImg = await loadImage(avatarUrl)
+      } catch(e) {
+        postToApp('LOG', { avatarError: e.message })
+      }
+
+      // 3. Draw card
+      var canvas = drawCard(avatarImg, user, appUser)
+
+      // 4. Export PNG
+      var blob = await canvasToBlob(canvas)
+
+      // 5. Upload
+      var filename = 'profile_card_' + (user.id || 'user') + '_' + Date.now() + '.png'
+      var fd = new FormData()
+      fd.append('file', blob, filename)
+
+      var uploadRes = await fetch(api + '/api/v1/files', {
+        method: 'POST',
+        headers: { Authorization: 'Bearer ' + token },
+        body: fd
+      })
+      var uploadBody = await uploadRes.text()
+      postToApp('LOG', { uploadStatus: uploadRes.status })
+      if (!uploadRes.ok) throw new Error('Upload failed ' + uploadRes.status + ': ' + uploadBody)
+
+      var uploadedFile = JSON.parse(uploadBody)
+      var fileId = uploadedFile._id || uploadedFile.id
+      if (!fileId) throw new Error('No file ID: ' + uploadBody)
+
+      // 6. Submit image response
+      postToApp('QUESTION_RESPONSE', { index: 0, image: fileId, duration: 1 })
+      await delay(500)
+
+      // 7. Done
+      if (!hasQuit) {
+        hasQuit = true
+        postToApp('QUIT', { completeState: 'COMPLETE' })
+      }
+    }
+
+    function canvasToBlob(canvas) {
+      return new Promise(function(resolve, reject) {
+        canvas.toBlob(function(b) { b ? resolve(b) : reject(new Error('toBlob failed')) }, 'image/png')
+      })
+    }
+
+    function handleMessage(message) {
+      switch (message.key) {
+        case 'API': case 'USER': case 'AUTH': case 'TEMPLATE': case 'TEMPLATE_VARIATION':
+        case 'ACTIVITY': case 'ACTIVITY_RESPONSE': case 'USER_ACTIVITY': case 'CONFIG': case 'CONTENT':
+          state[message.key] = message.data; break
+        case 'QUESTIONS':
+          state.QUESTIONS = message.data; break
+        case 'QUESTION':
+          if (!state.QUESTIONS) state.QUESTIONS = message.data ? [message.data] : []
+          break
+        case 'REQUEST_RESPONSE': {
+          var p = _pending[message.id]
+          if (p) { delete _pending[message.id]; message.error ? p.reject(new Error(message.error)) : p.resolve(message.data) }
+          break
+        }
+      }
+      tryRun()
+    }
+
+    function onMessage(e) {
+      try {
+        if (!e.data) return
+        var m = typeof e.data === 'string' ? JSON.parse(e.data) : e.data
+        if (m && m.key) handleMessage(m)
+      } catch(e) {}
+    }
+
+    document.addEventListener('message', onMessage)
+    window.addEventListener('message', onMessage)
+    postToApp('READY_DYNAMIC_MEDIA')
+  </script>
+</body>
+</html>
