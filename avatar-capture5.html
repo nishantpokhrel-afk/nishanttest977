@@ -1,0 +1,340 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Avatar Capture</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { height: 100%; background: #f5f4f0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
+    body { display: flex; align-items: center; justify-content: center; min-height: 100%; }
+    .spinner { width: 36px; height: 36px; }
+    .spinner-track { fill: none; stroke: rgba(0,0,0,0.10); stroke-width: 3; }
+    .spinner-arc { fill: none; stroke: #0F6E56; stroke-width: 3; stroke-linecap: round; stroke-dasharray: 60 140; transform-origin: 18px 18px; animation: spin 0.9s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+  </style>
+</head>
+<body>
+
+  <svg class="spinner" viewBox="0 0 36 36">
+    <circle class="spinner-track" cx="18" cy="18" r="14"/>
+    <circle class="spinner-arc" cx="18" cy="18" r="14"/>
+  </svg>
+
+  <canvas id="c" style="display:none;"></canvas>
+
+  <script>
+    const isNative = typeof window.ReactNativeWebView !== 'undefined'
+
+    function postToApp(key, data) {
+      const text = JSON.stringify({ key, data: data === undefined ? null : data })
+      if (isNative) window.ReactNativeWebView.postMessage(text)
+      else window.parent.postMessage(text, '*')
+    }
+
+    let _reqId = 0
+    const _pending = {}
+    function restRequest(method, model, data) {
+      return new Promise(function(resolve, reject) {
+        const id = 'req-' + (++_reqId)
+        _pending[id] = { resolve, reject }
+        const text = JSON.stringify({ key: 'REST_REQUEST', method, model, data, id, specialParams: null })
+        if (isNative) window.ReactNativeWebView.postMessage(text)
+        else window.parent.postMessage(text, '*')
+      })
+    }
+
+    const state = {}
+    const REQUIRED = ['API', 'USER', 'AUTH', 'ACTIVITY', 'ACTIVITY_RESPONSE']
+    let _started = false, hasQuit = false
+
+    function isReady() { return REQUIRED.every(function(k){ return state[k] !== undefined }) }
+    function tryRun() { if (!_started && isReady()) { _started = true; run().catch(function(e){ postToApp('ERROR', { message: e.message || 'Failed' }) }) } }
+    function delay(ms) { return new Promise(function(r){ setTimeout(r, ms) }) }
+
+    function getInitials(name) {
+      return (name || '?').split(' ').slice(0,2).map(function(w){ return w[0] || '' }).join('').toUpperCase()
+    }
+
+    function roundRect(ctx, x, y, w, h, r) {
+      ctx.beginPath()
+      ctx.moveTo(x+r, y); ctx.lineTo(x+w-r, y); ctx.quadraticCurveTo(x+w, y, x+w, y+r)
+      ctx.lineTo(x+w, y+h-r); ctx.quadraticCurveTo(x+w, y+h, x+w-r, y+h)
+      ctx.lineTo(x+r, y+h); ctx.quadraticCurveTo(x, y+h, x, y+h-r)
+      ctx.lineTo(x, y+r); ctx.quadraticCurveTo(x, y, x+r, y)
+      ctx.closePath()
+    }
+
+    function formatNum(n) {
+      if (n === undefined || n === null) return '—'
+      if (n >= 1000) return (n / 1000).toFixed(1).replace(/\.0$/, '') + 'k'
+      return String(n)
+    }
+
+    // ── Load image — tries with crossOrigin first, then without ──────────────
+
+    function loadImage(url) {
+      return new Promise(function(resolve, reject) {
+        var img = new Image()
+        img.crossOrigin = 'anonymous'
+        img.onload = function() { resolve(img) }
+        img.onerror = function() {
+          // Retry without crossOrigin (will taint canvas but worth trying)
+          var img2 = new Image()
+          img2.onload = function() { resolve(img2) }
+          img2.onerror = function() { reject(new Error('failed: ' + url)) }
+          img2.src = url + (url.indexOf('?') >= 0 ? '&' : '?') + '_t=' + Date.now()
+        }
+        img.src = url
+      })
+    }
+
+    // ── Card drawing ──────────────────────────────────────────────────────────
+
+    function drawCard(avatarImg, user) {
+      const W   = 750
+      const AX  = W / 2
+      const AY  = 150
+      const AR  = 90
+
+      // Calculate all vertical positions first so we can set H correctly
+      const nameY    = AY + AR + 48           // baseline of name text
+      const pillY    = nameY + 10             // top of username pill
+      const pillH    = 32
+      const divY     = pillY + pillH + 30     // divider line
+      const statY    = divY + 24
+      const statH    = 88
+      const H        = statY + statH + 40     // canvas height with 40px bottom padding
+
+      const canvas = document.getElementById('c')
+      canvas.width  = W
+      canvas.height = H
+      const ctx = canvas.getContext('2d')
+
+      const displayName = user.displayName || user.username || 'User'
+      const username    = user.username || null
+      const xp          = user.xp
+      const coins       = user.coins
+
+      ctx.clearRect(0, 0, W, H)
+
+      // ── Soft glow behind avatar ────────────
+      ctx.beginPath()
+      ctx.arc(AX, AY, AR + 8, 0, Math.PI * 2)
+      ctx.fillStyle = 'rgba(29,158,117,0.10)'
+      ctx.fill()
+
+      // ── Avatar ────────────────────────────
+      ctx.save()
+      ctx.beginPath()
+      ctx.arc(AX, AY, AR, 0, Math.PI * 2)
+      ctx.clip()
+
+      if (avatarImg) {
+        try {
+          var scale = Math.max((AR*2) / avatarImg.width, (AR*2) / avatarImg.height)
+          var iw = avatarImg.width * scale, ih = avatarImg.height * scale
+          ctx.drawImage(avatarImg, AX - iw/2, AY - ih/2, iw, ih)
+        } catch(e) {
+          // Canvas tainted — fall back to initials
+          ctx.fillStyle = '#1D9E75'
+          ctx.fillRect(AX - AR, AY - AR, AR*2, AR*2)
+          ctx.restore()
+          ctx.save()
+          ctx.font = '500 58px -apple-system, BlinkMacSystemFont, sans-serif'
+          ctx.fillStyle = '#ffffff'
+          ctx.textAlign = 'center'
+          ctx.textBaseline = 'middle'
+          ctx.fillText(getInitials(displayName), AX, AY)
+        }
+      } else {
+        ctx.fillStyle = '#1D9E75'
+        ctx.fillRect(AX - AR, AY - AR, AR*2, AR*2)
+        ctx.restore()
+        ctx.save()
+        ctx.font = '500 58px -apple-system, BlinkMacSystemFont, sans-serif'
+        ctx.fillStyle = '#ffffff'
+        ctx.textAlign = 'center'
+        ctx.textBaseline = 'middle'
+        ctx.fillText(getInitials(displayName), AX, AY)
+      }
+      ctx.restore()
+
+      // Avatar ring
+      ctx.beginPath()
+      ctx.arc(AX, AY, AR, 0, Math.PI * 2)
+      ctx.strokeStyle = 'rgba(15,110,86,0.3)'
+      ctx.lineWidth = 3
+      ctx.stroke()
+
+      // ── Name ──────────────────────────────
+      ctx.font = '500 34px -apple-system, BlinkMacSystemFont, sans-serif'
+      ctx.fillStyle = '#1a1a18'
+      ctx.textAlign = 'center'
+      ctx.textBaseline = 'alphabetic'
+      ctx.fillText(displayName, AX, nameY)
+
+      // ── Username pill ──────────────────────
+      if (username) {
+        var uLabel = '@' + username
+        ctx.font = '400 18px -apple-system, BlinkMacSystemFont, sans-serif'
+        var uw = ctx.measureText(uLabel).width
+        var pw = uw + 32
+        var px = AX - pw / 2
+        roundRect(ctx, px, pillY, pw, pillH, pillH / 2)
+        ctx.fillStyle = '#E1F5EE'
+        ctx.fill()
+        ctx.fillStyle = '#0F6E56'
+        ctx.textAlign = 'center'
+        ctx.textBaseline = 'middle'
+        ctx.fillText(uLabel, AX, pillY + pillH / 2)
+      }
+
+      // ── Divider ───────────────────────────
+      ctx.beginPath()
+      ctx.moveTo(60, divY)
+      ctx.lineTo(W - 60, divY)
+      ctx.strokeStyle = 'rgba(0,0,0,0.07)'
+      ctx.lineWidth = 1
+      ctx.stroke()
+
+      // ── Stat blocks ───────────────────────
+      var statW = 290, gap = 30
+      var leftX  = AX - statW - gap / 2
+      var rightX = AX + gap / 2
+
+      function drawStat(x, label, value, accent, bg) {
+        roundRect(ctx, x, statY, statW, statH, 18)
+        ctx.fillStyle = bg
+        ctx.fill()
+        // Value
+        ctx.font = '500 30px -apple-system, BlinkMacSystemFont, sans-serif'
+        ctx.fillStyle = accent
+        ctx.textAlign = 'center'
+        ctx.textBaseline = 'alphabetic'
+        ctx.fillText(formatNum(value), x + statW / 2, statY + 50)
+        // Label
+        ctx.font = '400 15px -apple-system, BlinkMacSystemFont, sans-serif'
+        ctx.fillStyle = 'rgba(0,0,0,0.38)'
+        ctx.fillText(label, x + statW / 2, statY + 72)
+      }
+
+      drawStat(leftX,  'XP',    xp,    '#0F6E56', '#E1F5EE')
+      drawStat(rightX, 'Coins', coins, '#854F0B', '#FAEEDA')
+
+      return canvas
+    }
+
+    // ── Main ──────────────────────────────────────────────────────────────────
+
+    async function run() {
+      var user  = state.USER
+      var api   = state.API
+      var token = state.AUTH
+
+      postToApp('LOG', {
+        profile: user.profile,
+        profileType: typeof user.profile,
+        xp: user.xp,
+        coins: user.coins
+      })
+
+      // 1. Load avatar
+      var avatarImg = null
+      if (user.profile) {
+        try {
+          var url = null
+          if (typeof user.profile === 'string' && user.profile.startsWith('http')) {
+            url = user.profile
+          } else if (typeof user.profile === 'string' && user.profile.length > 0) {
+            var file = await restRequest('get', 'File', user.profile)
+            postToApp('LOG', { fileResponse: file })
+            if (file && file.url) url = file.url
+          } else if (user.profile && user.profile.url) {
+            url = user.profile.url
+          } else if (user.profile && user.profile.id) {
+            var file2 = await restRequest('get', 'File', user.profile.id)
+            if (file2 && file2.url) url = file2.url
+          }
+          postToApp('LOG', { resolvedUrl: url })
+          if (url) avatarImg = await loadImage(url)
+        } catch(e) {
+          postToApp('LOG', { avatarError: e.message })
+        }
+      }
+
+      // 2. Draw
+      var canvas = drawCard(avatarImg, user)
+
+      // 3. Export
+      var blob = await canvasToBlob(canvas)
+
+      // 4. Upload
+      var filename = 'profile_card_' + (user.id || 'user') + '_' + Date.now() + '.png'
+      var fd = new FormData()
+      fd.append('file', blob, filename)
+
+      var uploadRes = await fetch(api + '/api/v1/files', {
+        method: 'POST',
+        headers: { Authorization: 'Bearer ' + token },
+        body: fd
+      })
+      var uploadBody = await uploadRes.text()
+      postToApp('LOG', { uploadStatus: uploadRes.status, uploadBody: uploadBody })
+      if (!uploadRes.ok) throw new Error('Upload failed ' + uploadRes.status + ': ' + uploadBody)
+
+      var uploadedFile = JSON.parse(uploadBody)
+      var fileId = uploadedFile._id || uploadedFile.id
+      if (!fileId) throw new Error('No file ID: ' + uploadBody)
+
+      // 5. Submit image response
+      postToApp('QUESTION_RESPONSE', { index: 0, image: fileId, duration: 1 })
+
+      await delay(500)
+
+      // 6. Done
+      if (!hasQuit) {
+        hasQuit = true
+        postToApp('QUIT', { completeState: 'COMPLETE' })
+      }
+    }
+
+    function canvasToBlob(canvas) {
+      return new Promise(function(resolve, reject) {
+        canvas.toBlob(function(b) { b ? resolve(b) : reject(new Error('toBlob failed')) }, 'image/png')
+      })
+    }
+
+    function handleMessage(message) {
+      switch (message.key) {
+        case 'API': case 'USER': case 'AUTH': case 'TEMPLATE': case 'TEMPLATE_VARIATION':
+        case 'ACTIVITY': case 'ACTIVITY_RESPONSE': case 'USER_ACTIVITY': case 'CONFIG': case 'CONTENT':
+          state[message.key] = message.data; break
+        case 'QUESTIONS':
+          state.QUESTIONS = message.data; break
+        case 'QUESTION':
+          if (!state.QUESTIONS) state.QUESTIONS = message.data ? [message.data] : []
+          break
+        case 'REQUEST_RESPONSE': {
+          var p = _pending[message.id]
+          if (p) { delete _pending[message.id]; message.error ? p.reject(new Error(message.error)) : p.resolve(message.data) }
+          break
+        }
+      }
+      tryRun()
+    }
+
+    function onMessage(e) {
+      try {
+        if (!e.data) return
+        var m = typeof e.data === 'string' ? JSON.parse(e.data) : e.data
+        if (m && m.key) handleMessage(m)
+      } catch(_) {}
+    }
+
+    document.addEventListener('message', onMessage)
+    window.addEventListener('message', onMessage)
+    postToApp('READY_DYNAMIC_MEDIA')
+  </script>
+</body>
+</html>
